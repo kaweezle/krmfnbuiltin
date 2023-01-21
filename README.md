@@ -106,7 +106,7 @@ metadata:
         path: krmfnbuiltin
     # Can also be:
     #  container:
-    #    image: ghcr.io/kaweezle/krmfnbuiltin:v0.0.1
+    #    image: ghcr.io/kaweezle/krmfnbuiltin:v0.0.2
 patch: |-
   - op: replace
       path: /spec/source/repoURL
@@ -139,7 +139,8 @@ source:
   targetRevision: feature/experiment
 ```
 
-You now can commit the 10 modified manifests in your branch.
+You now can commit the 10 modified manifests in your branch and deploy the
+applications.
 
 <!-- prettier-ignore-start -->
 
