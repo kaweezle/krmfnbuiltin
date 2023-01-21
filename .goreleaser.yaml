@@ -1,0 +1,75 @@
+# This is an example .goreleaser.yml file with some sensible defaults.
+# Make sure to check the documentation at https://goreleaser.com
+before:
+  hooks:
+    - go mod tidy
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+      - windows
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X
+        main.date={{ .CommitDate }} -X main.builtBy=goreleaser
+    binary: krmfnbuiltin
+    id: krmfnbuiltin
+archives:
+  - format: binary
+    name_template: '{{ .Binary }}_v{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
+checksum:
+  name_template: "SHA256SUMS"
+snapshot:
+  name_template: "{{ incpatch .Version }}-devel"
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs"
+      - "^test"
+      - "^ci"
+      - "^refactor"
+      - Merge pull request
+      - Merge branch
+      - go mod tidy
+nfpms:
+  - formats: [apk]
+    license: Apache 2.0
+    package_name: krmfnbuiltin
+    file_name_template: >-
+      {{ .PackageName }}-
+      {{- .Version }}.
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+      {{- if .Mips }}_{{ .Mips }}{{ end }}
+    maintainer: Kaweezle <kaweezle-devel@kaweezle.com>
+    description: KRM function (Kustomize) to decrypt SOPS encoded resources
+    homepage: https://github.com/kaweezle/krmfnbuiltin
+    bindir: /usr/bin
+    apk:
+      signature:
+        key_file: gpg_key.asc
+        key_name: kaweezle-devel@kaweezle.com-c9d89864.rsa.pub
+release:
+  extra_files:
+    - glob: ./kaweezle-devel@kaweezle.com-c9d89864.rsa.pub
+dockers:
+  - image_templates:
+      - "ghcr.io/kaweezle/krmfnbuiltin:latest"
+      - "ghcr.io/kaweezle/krmfnbuiltin:{{ .Version }}"
+    dockerfile: Dockerfile
+    build_flag_templates:
+      - --label=org.opencontainers.image.title={{ .ProjectName }}
+      - --label=org.opencontainers.image.description={{ .ProjectName }}
+      - --label=org.opencontainers.image.url=https://github.com/kaweezle/krmfnbuiltin
+      - --label=org.opencontainers.image.source=https://github.com/kaweezle/krmfnbuiltin
+      - --label=org.opencontainers.image.version={{ .Version }}
+      - --label=org.opencontainers.image.created={{ time "2006-01-02T15:04:05Z07:00" }}
+      - --label=org.opencontainers.image.revision={{ .FullCommit }}
+      - --label=org.opencontainers.image.licenses=Apache-2.0

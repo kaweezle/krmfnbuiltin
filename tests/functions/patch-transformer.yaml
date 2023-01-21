@@ -1,0 +1,20 @@
+apiVersion: builtin
+kind: PatchTransformer
+metadata:
+  name: not-important-to-example
+  annotations:
+    config.kubernetes.io/function: |
+      exec:
+        path: ../krmfnbuiltin
+patch: |-
+  - op: replace
+    path: /spec/source/repoURL
+    value: https://github.com/antoinemartin/autocloud.git
+  - op: replace
+    path: /spec/source/targetRevision
+    value: deploy/citest
+target:
+  group: argoproj.io
+  version: v1alpha1
+  kind: Application
+  annotationSelector: "autocloud/local=true"

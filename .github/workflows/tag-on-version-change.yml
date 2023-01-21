@@ -1,0 +1,14 @@
+name: Create version tag on code change
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  versioner:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Update Version
+        uses: antoinemartin/tag-action@main
+        env:
+          ACCESS_TOKEN: ${{ secrets.REPO_ACCESS_TOKEN }}
