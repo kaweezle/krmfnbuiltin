@@ -1,0 +1,12 @@
+apiVersion: builtin
+kind: ConfigMapGenerator
+metadata:
+  name: configuration-map
+  namespace: argocd
+  annotations:
+    config.kubernetes.io/function: |
+      exec:
+        path: ../krmfnbuiltin
+literals:
+  - repoURL=https://github.com/antoinemartin/autocloud.git
+  - targetRevision=deploy/citest

@@ -11,7 +11,11 @@ set -e pipefail
 
 trap "cp compare/argocd.original.yaml applications/argocd.yaml" EXIT
 
-echo "Running kustomize with transformer..."
+echo "Running kustomize with patch transformer..."
 kustomize fn run --enable-exec --fn-path functions applications
+diff <(yq eval -P compare/argocd.expected.yaml) <(yq eval -P applications/argocd.yaml)
+cp compare/argocd.original.yaml applications/argocd.yaml
+echo "Running kustomize with replacement transformer..."
+kustomize fn run --enable-exec --fn-path functions2 applications
 diff <(yq eval -P compare/argocd.expected.yaml) <(yq eval -P applications/argocd.yaml)
 echo "Done ok 🎉"

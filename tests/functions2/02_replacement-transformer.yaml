@@ -1,0 +1,29 @@
+apiVersion: builtin
+kind: ReplacementTransformer
+metadata:
+  name: replacement-transformer
+  namespace: argocd
+  annotations:
+    config.kubernetes.io/prune-local: "true"
+    config.kubernetes.io/function: |
+      exec:
+        path: ../krmfnbuiltin
+replacements:
+  - source:
+      kind: ConfigMap
+      fieldPath: data.repoURL
+    targets:
+      - select:
+          kind: Application
+          annotationSelector: "autocloud/local=true"
+        fieldPaths:
+          - spec.source.repoURL
+  - source:
+      kind: ConfigMap
+      fieldPath: data.targetRevision
+    targets:
+      - select:
+          kind: Application
+          annotationSelector: "autocloud/local=true"
+        fieldPaths:
+          - spec.source.targetRevision
