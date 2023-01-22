@@ -3,6 +3,7 @@ package plugins
 import (
 	"os"
 
+	"github.com/kaweezle/krmfnbuiltin/pkg/extras"
 	"sigs.k8s.io/kustomize/api/builtins"
 	"sigs.k8s.io/kustomize/api/filesys"
 	fLdr "sigs.k8s.io/kustomize/api/loader"
@@ -36,6 +37,7 @@ const (
 	ValueAddTransformer
 	HelmChartInflationGenerator
 	ReplacementTransformer
+	GitConfigMapGenerator
 )
 
 var stringToBuiltinPluginTypeMap map[string]BuiltinPluginType
@@ -117,6 +119,7 @@ var GeneratorFactories = map[BuiltinPluginType]func() resmap.GeneratorPlugin{
 	IAMPolicyGenerator:          builtins.NewIAMPolicyGeneratorPlugin,
 	SecretGenerator:             builtins.NewSecretGeneratorPlugin,
 	HelmChartInflationGenerator: builtins.NewHelmChartInflationGeneratorPlugin,
+	GitConfigMapGenerator:       extras.NewGitConfigMapGeneratorPlugin,
 }
 
 func MakeBuiltinPlugin(r resid.Gvk) (resmap.Configurable, error) {
