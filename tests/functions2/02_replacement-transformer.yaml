@@ -18,6 +18,7 @@ replacements:
           annotationSelector: "autocloud/local=true"
         fieldPaths:
           - spec.source.repoURL
+          - spec.source.helm.parameters.[name=common.repoURL].value
   - source:
       kind: ConfigMap
       fieldPath: data.targetRevision
@@ -27,3 +28,4 @@ replacements:
           annotationSelector: "autocloud/local=true"
         fieldPaths:
           - spec.source.targetRevision
+          - spec.source.helm.parameters.[name=common.targetRevision].value

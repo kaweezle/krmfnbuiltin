@@ -19,6 +19,12 @@ spec:
     path: packages/argocd
     repoURL: https://github.com/antoinemartin/autocloud.git
     targetRevision: deploy/citest
+    helm:
+      parameters:
+        - name: common.targetRevision
+          value: deploy/citest
+        - name: common.repoURL
+          value: https://github.com/antoinemartin/autocloud.git
   syncPolicy:
     automated:
       allowEmpty: true
