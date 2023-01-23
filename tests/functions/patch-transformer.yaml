@@ -13,6 +13,12 @@ patch: |-
   - op: replace
     path: /spec/source/targetRevision
     value: deploy/citest
+  - op: replace
+    path: /spec/source/helm/parameters/1/value
+    value: https://github.com/antoinemartin/autocloud.git
+  - op: replace
+    path: /spec/source/helm/parameters/0/value
+    value: deploy/citest
 target:
   group: argoproj.io
   version: v1alpha1

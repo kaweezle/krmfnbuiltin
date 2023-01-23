@@ -1,8 +1,17 @@
-package transformers
+package plugins
 
 import (
+	"os"
+
+	"github.com/kaweezle/krmfnbuiltin/pkg/extras"
 	"sigs.k8s.io/kustomize/api/builtins"
+	"sigs.k8s.io/kustomize/api/filesys"
+	fLdr "sigs.k8s.io/kustomize/api/loader"
+	"sigs.k8s.io/kustomize/api/provider"
 	"sigs.k8s.io/kustomize/api/resmap"
+	"sigs.k8s.io/kustomize/api/types"
+	"sigs.k8s.io/kustomize/kyaml/errors"
+	"sigs.k8s.io/kustomize/kyaml/resid"
 )
 
 //go:generate go run golang.org/x/tools/cmd/stringer -type=BuiltinPluginType
@@ -28,6 +37,7 @@ const (
 	ValueAddTransformer
 	HelmChartInflationGenerator
 	ReplacementTransformer
+	GitConfigMapGenerator
 )
 
 var stringToBuiltinPluginTypeMap map[string]BuiltinPluginType
@@ -39,6 +49,9 @@ func init() { //nolint:gochecknoinits
 func makeStringToBuiltinPluginTypeMap() (result map[string]BuiltinPluginType) {
 	result = make(map[string]BuiltinPluginType, 23)
 	for k := range TransformerFactories {
+		result[k.String()] = k
+	}
+	for k := range GeneratorFactories {
 		result[k.String()] = k
 	}
 	return
@@ -99,4 +112,44 @@ var TransformerFactories = map[BuiltinPluginType]func() resmap.TransformerPlugin
 	// Do not wired SortOrderTransformer as a builtin plugin.
 	// We only want it to be available in the top-level kustomization.
 	// See: https://github.com/kubernetes-sigs/kustomize/issues/3913
+}
+
+var GeneratorFactories = map[BuiltinPluginType]func() resmap.GeneratorPlugin{
+	ConfigMapGenerator:          builtins.NewConfigMapGeneratorPlugin,
+	IAMPolicyGenerator:          builtins.NewIAMPolicyGeneratorPlugin,
+	SecretGenerator:             builtins.NewSecretGeneratorPlugin,
+	HelmChartInflationGenerator: builtins.NewHelmChartInflationGeneratorPlugin,
+	GitConfigMapGenerator:       extras.NewGitConfigMapGeneratorPlugin,
+}
+
+func MakeBuiltinPlugin(r resid.Gvk) (resmap.Configurable, error) {
+	bpt := GetBuiltinPluginType(r.Kind)
+	if f, ok := TransformerFactories[bpt]; ok {
+		return f(), nil
+	}
+	if f, ok := GeneratorFactories[bpt]; ok {
+		return f(), nil
+	}
+	return nil, errors.Errorf("unable to load builtin %s", r)
+}
+
+func NewPluginHelpers() (*resmap.PluginHelpers, error) {
+	depProvider := provider.NewDepProvider()
+
+	fSys := filesys.MakeFsOnDisk()
+	path, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+	resmapFactory := resmap.NewFactory(depProvider.GetResourceFactory())
+	resmapFactory.RF().IncludeLocalConfigs = true
+
+	lr := fLdr.RestrictionNone
+
+	ldr, err := fLdr.NewLoader(lr, path, fSys)
+	if err != nil {
+		return nil, err
+	}
+
+	return resmap.NewPluginHelpers(ldr, depProvider.GetFieldValidator(), resmapFactory, types.DisabledPluginConfig()), nil
 }

@@ -19,6 +19,12 @@ spec:
     path: packages/argocd
     repoURL: https://github.com/anotherproject/anothergit
     targetRevision: main
+    helm:
+      parameters:
+        - name: common.targetRevision
+          value: main
+        - name: common.repoURL
+          value: https://github.com/anotherproject/anothergit
   syncPolicy:
     automated:
       allowEmpty: true

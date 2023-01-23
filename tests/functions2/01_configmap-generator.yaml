@@ -1,0 +1,15 @@
+apiVersion: builtin
+# Use this to inject current git values
+# kind: GitConfigMapGenerator
+kind: ConfigMapGenerator
+metadata:
+  name: configuration-map
+  namespace: argocd
+  annotations:
+    config.kubernetes.io/function: |
+      exec:
+        path: ../krmfnbuiltin
+# When using GitConfigMapGenerator, these are automatically injected
+literals:
+  - repoURL=https://github.com/antoinemartin/autocloud.git
+  - targetRevision=deploy/citest
