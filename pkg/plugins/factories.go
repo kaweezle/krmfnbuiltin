@@ -106,7 +106,7 @@ var TransformerFactories = map[BuiltinPluginType]func() resmap.TransformerPlugin
 	PrefixSuffixTransformer:        NewMultiTransformer,
 	PrefixTransformer:              builtins.NewPrefixTransformerPlugin,
 	SuffixTransformer:              builtins.NewSuffixTransformerPlugin,
-	ReplacementTransformer:         builtins.NewReplacementTransformerPlugin,
+	ReplacementTransformer:         extras.NewExtendedReplacementTransformerPlugin,
 	ReplicaCountTransformer:        builtins.NewReplicaCountTransformerPlugin,
 	ValueAddTransformer:            builtins.NewValueAddTransformerPlugin,
 	// Do not wired SortOrderTransformer as a builtin plugin.

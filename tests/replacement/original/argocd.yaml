@@ -25,6 +25,13 @@ spec:
           value: main
         - name: common.repoURL
           value: https://github.com/anotherproject/anothergit
+      values: |
+        uninode: true
+        apps:
+          enabled: true
+        common:
+          targetRevision: main
+          repoURL: https://github.com/anotherproject/anothergit
   syncPolicy:
     automated:
       allowEmpty: true
