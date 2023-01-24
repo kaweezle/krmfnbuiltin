@@ -373,6 +373,51 @@ func (s *ExtenderTestSuite) TestJsonArrayExtender() {
 	require.Equal("deploy/citest", string(value), "error fetching changed value")
 }
 
+func (s *ExtenderTestSuite) TestTomlExtender() {
+	require := s.Require()
+	source := `
+uninode = true
+[common]
+targetRevision = 'main'
+[apps]
+enabled = true
+`
+	expected := `uninode = true
+
+[apps]
+enabled = true
+
+[common]
+targetRevision = 'deploy/citest'
+`
+
+	p := `!!toml.common.targetRevision`
+	path := kyaml_utils.SmarterPathSplitter(p, ".")
+
+	extensions := []*ExtendedSegment{}
+	prefix, err := splitExtendedPath(path, &extensions)
+	require.NoError(err)
+	require.Len(prefix, 0, "There should be no prefix")
+	require.Len(extensions, 1, "There should be 2 extensions")
+	require.Equal("toml", extensions[0].Encoding, "The first extension should be toml")
+
+	tomlXP := extensions[0]
+	tomlExt, err := tomlXP.Extender([]byte(source))
+	require.NoError(err)
+	value, err := tomlExt.Get(tomlXP.Path)
+	require.NoError(err)
+	require.Equal("main", string(value), "error fetching value")
+	require.NoError(tomlExt.Set(tomlXP.Path, []byte("deploy/citest")))
+
+	modified, err := tomlExt.GetPayload()
+	require.NoError(err)
+	require.Equal(expected, string(modified), "final toml")
+
+	value, err = tomlExt.Get(tomlXP.Path)
+	require.NoError(err)
+	require.Equal("deploy/citest", string(value), "error fetching changed value")
+}
+
 func TestExtender(t *testing.T) {
 	suite.Run(t, new(ExtenderTestSuite))
 }

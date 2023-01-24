@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/pelletier/go-toml/v2"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 	"sigs.k8s.io/kustomize/kyaml/errors"
@@ -48,6 +49,7 @@ const (
 	Base64Extender
 	RegexExtender
 	JsonExtender
+	TomlExtender
 )
 
 var stringToExtenderTypeMap map[string]ExtenderType
@@ -361,6 +363,85 @@ func NewJsonExtender() Extender {
 	return &jsonExtender{}
 }
 
+///////
+// TOML
+///////
+
+type tomlExtender struct {
+	node *yaml.RNode
+}
+
+func (e *tomlExtender) SetPayload(payload []byte) error {
+
+	m := map[string]interface{}{}
+	err := toml.Unmarshal(payload, &m)
+	if err != nil {
+		return errors.WrapPrefixf(err, "while un-marshalling toml")
+	}
+
+	e.node, err = yaml.FromMap(m)
+	if err != nil {
+		return errors.WrapPrefixf(err, "while converting into yaml")
+	}
+
+	return nil
+}
+
+func getTOMLPayload(node *yaml.RNode) ([]byte, error) {
+	m, err := node.Map()
+	if err != nil {
+		return nil, errors.WrapPrefixf(err, "while encoding to map")
+	}
+	return toml.Marshal(m)
+}
+
+func (e *tomlExtender) GetPayload() ([]byte, error) {
+	return getTOMLPayload(e.node)
+}
+
+func (e *tomlExtender) Get(path []string) ([]byte, error) {
+	targetFields, err := Lookup(e.node, path)
+	if err != nil {
+		return nil, errors.WrapPrefixf(err, "error fetching elements in replacement target")
+	}
+
+	if len(targetFields) > 1 {
+		return nil, fmt.Errorf("path %s returned %d items. Expected one", strings.Join(path, "."), len(targetFields))
+	}
+
+	target := targetFields[0]
+	if target.YNode().Kind == yaml.ScalarNode {
+		return []byte(target.YNode().Value), nil
+	}
+
+	return getTOMLPayload(target)
+}
+
+func (e *tomlExtender) Set(path []string, value any) error {
+
+	targetFields, err := Lookup(e.node, path)
+	if err != nil {
+		return fmt.Errorf("error fetching elements in replacement target: %w", err)
+	}
+
+	for _, t := range targetFields {
+		if t.YNode().Kind == yaml.ScalarNode {
+			t.YNode().Value = string(GetByteValue(value))
+		} else {
+			if v, ok := value.(*yaml.Node); ok {
+				t.SetYNode(v)
+			} else {
+				return fmt.Errorf("setting non toml object in place of object of type %s at path %s", t.YNode().Tag, strings.Join(path, "."))
+			}
+		}
+	}
+	return nil
+}
+
+func NewTomlExtender() Extender {
+	return &tomlExtender{}
+}
+
 ////////////
 // Factories
 ////////////
@@ -370,6 +451,7 @@ var ExtenderFactories = map[ExtenderType]func() Extender{
 	Base64Extender: NewBase64Extender,
 	RegexExtender:  NewRegexExtender,
 	JsonExtender:   NewJsonExtender,
+	TomlExtender:   NewTomlExtender,
 }
 
 func (path *ExtendedSegment) Extender(payload []byte) (Extender, error) {
