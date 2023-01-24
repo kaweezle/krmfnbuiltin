@@ -12,11 +12,12 @@ func _() {
 	_ = x[YamlExtender-1]
 	_ = x[Base64Extender-2]
 	_ = x[RegexExtender-3]
+	_ = x[JsonExtender-4]
 }
 
-const _ExtenderType_name = "UnknownYamlExtenderBase64ExtenderRegexExtender"
+const _ExtenderType_name = "UnknownYamlExtenderBase64ExtenderRegexExtenderJsonExtender"
 
-var _ExtenderType_index = [...]uint8{0, 7, 19, 33, 46}
+var _ExtenderType_index = [...]uint8{0, 7, 19, 33, 46, 58}
 
 func (i ExtenderType) String() string {
 	if i < 0 || i >= ExtenderType(len(_ExtenderType_index)-1) {

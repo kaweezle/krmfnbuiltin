@@ -3,6 +3,7 @@ package extras
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -12,6 +13,7 @@ import (
 	"golang.org/x/text/language"
 	"sigs.k8s.io/kustomize/kyaml/errors"
 	"sigs.k8s.io/kustomize/kyaml/kio"
+	"sigs.k8s.io/kustomize/kyaml/kio/kioutil"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 )
 
@@ -45,6 +47,7 @@ const (
 	YamlExtender
 	Base64Extender
 	RegexExtender
+	JsonExtender
 )
 
 var stringToExtenderTypeMap map[string]ExtenderType
@@ -89,8 +92,7 @@ type yamlExtender struct {
 	node *yaml.RNode
 }
 
-func (e *yamlExtender) SetPayload(payload []byte) error {
-
+func readPayload(payload []byte) (*yaml.RNode, error) {
 	nodes, err := (&kio.ByteReader{
 		Reader:                bytes.NewBuffer(payload),
 		OmitReaderAnnotations: false,
@@ -99,28 +101,36 @@ func (e *yamlExtender) SetPayload(payload []byte) error {
 	}).Read()
 
 	if err != nil {
-		return errors.WrapPrefixf(err, "while reading yaml payload")
+		return nil, errors.WrapPrefixf(err, "while reading payload")
 	}
-	e.node = nodes[0]
-	return nil
+	return nodes[0], nil
 }
 
-func (e *yamlExtender) GetPayload() ([]byte, error) {
+func (e *yamlExtender) SetPayload(payload []byte) (err error) {
+	e.node, err = readPayload(payload)
+	return
+}
+
+func getNodeBytes(nodes []*yaml.RNode) ([]byte, error) {
 	var b bytes.Buffer
-	err := (&kio.ByteWriter{Writer: &b}).Write([]*yaml.RNode{e.node})
+	err := (&kio.ByteWriter{Writer: &b}).Write(nodes)
 	return b.Bytes(), err
 }
 
-func (e *yamlExtender) LookupNode() *yaml.RNode {
-	seqNode, err := e.node.Pipe(yaml.Lookup(yaml.BareSeqNodeWrappingKey))
+func (e *yamlExtender) GetPayload() ([]byte, error) {
+	return getNodeBytes([]*yaml.RNode{e.node})
+}
+
+func LookupNode(node *yaml.RNode) *yaml.RNode {
+	seqNode, err := node.Pipe(yaml.Lookup(yaml.BareSeqNodeWrappingKey))
 	if err == nil && !seqNode.IsNilOrEmpty() {
 		return seqNode
 	}
-	return e.node
+	return node
 }
 
-func (e *yamlExtender) Lookup(path []string) ([]*yaml.RNode, error) {
-	node, err := e.LookupNode().Pipe(&yaml.PathMatcher{Path: path})
+func Lookup(node *yaml.RNode, path []string) ([]*yaml.RNode, error) {
+	node, err := LookupNode(node).Pipe(&yaml.PathMatcher{Path: path})
 	if err != nil {
 		return nil, errors.WrapPrefixf(err, "while getting path %s", strings.Join(path, "."))
 	}
@@ -129,7 +139,7 @@ func (e *yamlExtender) Lookup(path []string) ([]*yaml.RNode, error) {
 }
 
 func (e *yamlExtender) Get(path []string) ([]byte, error) {
-	targetFields, err := e.Lookup(path)
+	targetFields, err := Lookup(e.node, path)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching elements in replacement target: %w", err)
 	}
@@ -138,17 +148,12 @@ func (e *yamlExtender) Get(path []string) ([]byte, error) {
 		return []byte(targetFields[0].YNode().Value), nil
 	}
 
-	var b bytes.Buffer
-	err = (&kio.ByteWriter{Writer: &b}).Write(targetFields)
-	if err != nil {
-		return nil, errors.WrapPrefixf(err, "while serializing path %s", strings.Join(path, "."))
-	}
-	return b.Bytes(), err
+	return getNodeBytes(targetFields)
 }
 
 func (e *yamlExtender) Set(path []string, value any) error {
 
-	targetFields, err := e.Lookup(path)
+	targetFields, err := Lookup(e.node, path)
 	if err != nil {
 		return fmt.Errorf("error fetching elements in replacement target: %w", err)
 	}
@@ -280,6 +285,82 @@ func NewRegexExtender() Extender {
 	return &regexExtender{}
 }
 
+///////
+// JSON
+///////
+
+type jsonExtender struct {
+	node *yaml.RNode
+}
+
+func (e *jsonExtender) SetPayload(payload []byte) (err error) {
+	e.node, err = readPayload(payload)
+	return
+}
+
+func getJSONPayload(node *yaml.RNode) ([]byte, error) {
+	var b bytes.Buffer
+	if node.YNode().Kind == yaml.MappingNode {
+		node = node.Copy()
+		node.Pipe(yaml.ClearAnnotation(kioutil.IndexAnnotation))
+		node.Pipe(yaml.ClearAnnotation(kioutil.LegacyIndexAnnotation))
+		node.Pipe(yaml.ClearAnnotation(kioutil.SeqIndentAnnotation))
+		yaml.ClearEmptyAnnotations(node)
+	}
+	encoder := json.NewEncoder(&b)
+	encoder.SetIndent("", "  ")
+	err := errors.Wrap(encoder.Encode(node))
+
+	return b.Bytes(), err
+}
+
+func (e *jsonExtender) GetPayload() ([]byte, error) {
+	return getJSONPayload(LookupNode(e.node))
+}
+
+func (e *jsonExtender) Get(path []string) ([]byte, error) {
+	targetFields, err := Lookup(e.node, path)
+	if err != nil {
+		return nil, errors.WrapPrefixf(err, "error fetching elements in replacement target")
+	}
+
+	if len(targetFields) > 1 {
+		return nil, fmt.Errorf("path %s returned %d items. Expected one", strings.Join(path, "."), len(targetFields))
+	}
+
+	target := targetFields[0]
+	if target.YNode().Kind == yaml.ScalarNode {
+		return []byte(target.YNode().Value), nil
+	}
+
+	return getJSONPayload(target)
+}
+
+func (e *jsonExtender) Set(path []string, value any) error {
+
+	targetFields, err := Lookup(e.node, path)
+	if err != nil {
+		return fmt.Errorf("error fetching elements in replacement target: %w", err)
+	}
+
+	for _, t := range targetFields {
+		if t.YNode().Kind == yaml.ScalarNode {
+			t.YNode().Value = string(GetByteValue(value))
+		} else {
+			if v, ok := value.(*yaml.Node); ok {
+				t.SetYNode(v)
+			} else {
+				return fmt.Errorf("setting non json object in place of object of type %s at path %s", t.YNode().Tag, strings.Join(path, "."))
+			}
+		}
+	}
+	return nil
+}
+
+func NewJsonExtender() Extender {
+	return &jsonExtender{}
+}
+
 ////////////
 // Factories
 ////////////
@@ -288,6 +369,7 @@ var ExtenderFactories = map[ExtenderType]func() Extender{
 	YamlExtender:   NewYamlExtender,
 	Base64Extender: NewBase64Extender,
 	RegexExtender:  NewRegexExtender,
+	JsonExtender:   NewJsonExtender,
 }
 
 func (path *ExtendedSegment) Extender(payload []byte) (Extender, error) {

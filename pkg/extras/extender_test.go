@@ -273,6 +273,106 @@ common:
 	require.Equal(expected, b.String(), sString, "replacement failed")
 }
 
+func (s *ExtenderTestSuite) TestJsonExtender() {
+	require := s.Require()
+	source := `{
+  "common": {
+    "targetRevision": "main"
+  },
+  "uninode": true,
+  "apps": {
+    "enabled": true
+  }
+}`
+	expected := `{
+  "apps": {
+    "enabled": true
+  },
+  "common": {
+    "targetRevision": "deploy/citest"
+  },
+  "uninode": true
+}
+`
+
+	p := `!!json.common.targetRevision`
+	path := kyaml_utils.SmarterPathSplitter(p, ".")
+
+	extensions := []*ExtendedSegment{}
+	prefix, err := splitExtendedPath(path, &extensions)
+	require.NoError(err)
+	require.Len(prefix, 0, "There should be no prefix")
+	require.Len(extensions, 1, "There should be 2 extensions")
+	require.Equal("json", extensions[0].Encoding, "The first extension should be json")
+
+	jsonXP := extensions[0]
+	jsonExt, err := jsonXP.Extender([]byte(source))
+	require.NoError(err)
+	value, err := jsonExt.Get(jsonXP.Path)
+	require.NoError(err)
+	require.Equal("main", string(value), "error fetching value")
+	require.NoError(jsonExt.Set(jsonXP.Path, []byte("deploy/citest")))
+
+	modified, err := jsonExt.GetPayload()
+	require.NoError(err)
+	require.Equal(expected, string(modified), "final json")
+
+	value, err = jsonExt.Get(jsonXP.Path)
+	require.NoError(err)
+	require.Equal("deploy/citest", string(value), "error fetching changed value")
+}
+
+func (s *ExtenderTestSuite) TestJsonArrayExtender() {
+	require := s.Require()
+	source := `[
+  {
+    "name": "targetRevision",
+    "value": "main"
+  },
+  {
+    "name": "repoURL",
+    "value": "https://github.com/kaweezle/example.git"
+  }
+]`
+	expected := `[
+  {
+    "name": "targetRevision",
+    "value": "deploy/citest"
+  },
+  {
+    "name": "repoURL",
+    "value": "https://github.com/kaweezle/example.git"
+  }
+]
+`
+
+	p := `!!json.[name=targetRevision].value`
+	path := kyaml_utils.SmarterPathSplitter(p, ".")
+
+	extensions := []*ExtendedSegment{}
+	prefix, err := splitExtendedPath(path, &extensions)
+	require.NoError(err)
+	require.Len(prefix, 0, "There should be no prefix")
+	require.Len(extensions, 1, "There should be 2 extensions")
+	require.Equal("json", extensions[0].Encoding, "The first extension should be json")
+
+	jsonXP := extensions[0]
+	jsonExt, err := jsonXP.Extender([]byte(source))
+	require.NoError(err)
+	value, err := jsonExt.Get(jsonXP.Path)
+	require.NoError(err)
+	require.Equal("main", string(value), "error fetching value")
+	require.NoError(jsonExt.Set(jsonXP.Path, []byte("deploy/citest")))
+
+	modified, err := jsonExt.GetPayload()
+	require.NoError(err)
+	require.Equal(expected, string(modified), "final json")
+
+	value, err = jsonExt.Get(jsonXP.Path)
+	require.NoError(err)
+	require.Equal("deploy/citest", string(value), "error fetching changed value")
+}
+
 func TestExtender(t *testing.T) {
 	suite.Run(t, new(ExtenderTestSuite))
 }
