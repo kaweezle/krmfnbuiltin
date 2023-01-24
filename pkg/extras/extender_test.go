@@ -418,6 +418,51 @@ targetRevision = 'deploy/citest'
 	require.Equal("deploy/citest", string(value), "error fetching changed value")
 }
 
+func (s *ExtenderTestSuite) TestIniExtender() {
+	require := s.Require()
+	source := `
+uninode = true
+[common]
+targetRevision = main
+[apps]
+enabled = true
+`
+	expected := `uninode = true
+
+[common]
+targetRevision = deploy/citest
+
+[apps]
+enabled = true
+`
+
+	p := `!!ini.common.targetRevision`
+	path := kyaml_utils.SmarterPathSplitter(p, ".")
+
+	extensions := []*ExtendedSegment{}
+	prefix, err := splitExtendedPath(path, &extensions)
+	require.NoError(err)
+	require.Len(prefix, 0, "There should be no prefix")
+	require.Len(extensions, 1, "There should be 2 extensions")
+	require.Equal("ini", extensions[0].Encoding, "The first extension should be ini")
+
+	iniXP := extensions[0]
+	iniExt, err := iniXP.Extender([]byte(source))
+	require.NoError(err)
+	value, err := iniExt.Get(iniXP.Path)
+	require.NoError(err)
+	require.Equal("main", string(value), "error fetching value")
+	require.NoError(iniExt.Set(iniXP.Path, []byte("deploy/citest")))
+
+	modified, err := iniExt.GetPayload()
+	require.NoError(err)
+	require.Equal(expected, string(modified), "final ini")
+
+	value, err = iniExt.Get(iniXP.Path)
+	require.NoError(err)
+	require.Equal("deploy/citest", string(value), "error fetching changed value")
+}
+
 func TestExtender(t *testing.T) {
 	suite.Run(t, new(ExtenderTestSuite))
 }

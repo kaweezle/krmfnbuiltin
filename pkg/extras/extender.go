@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/go-ini/ini"
 	"github.com/pelletier/go-toml/v2"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
@@ -50,6 +51,7 @@ const (
 	RegexExtender
 	JsonExtender
 	TomlExtender
+	IniExtender
 )
 
 var stringToExtenderTypeMap map[string]ExtenderType
@@ -442,6 +444,62 @@ func NewTomlExtender() Extender {
 	return &tomlExtender{}
 }
 
+///////
+// TOML
+///////
+
+type iniExtender struct {
+	file *ini.File
+}
+
+func (e *iniExtender) SetPayload(payload []byte) (err error) {
+
+	e.file, err = ini.Load(payload)
+	return err
+}
+
+func (e *iniExtender) GetPayload() ([]byte, error) {
+	var b bytes.Buffer
+	_, err := e.file.WriteTo(&b)
+	return b.Bytes(), err
+}
+
+func (e *iniExtender) keyFromPath(path []string) (*ini.Key, error) {
+	if len(path) < 1 || len(path) > 2 {
+		return nil, fmt.Errorf("invalid path length: %d", len(path))
+	}
+	section := ""
+	key := path[0]
+	if len(path) == 2 {
+		section = key
+		key = path[1]
+	}
+	return e.file.Section(section).Key(key), nil
+}
+
+func (e *iniExtender) Get(path []string) ([]byte, error) {
+	k, err := e.keyFromPath(path)
+	if err != nil {
+		return nil, fmt.Errorf("while getting key at path %s", strings.Join(path, "."))
+	}
+	return []byte(k.String()), nil
+}
+
+func (e *iniExtender) Set(path []string, value any) error {
+	k, err := e.keyFromPath(path)
+	if err != nil {
+		return fmt.Errorf("while getting key at path %s", strings.Join(path, "."))
+	}
+
+	k.SetValue(string(GetByteValue(value)))
+
+	return nil
+}
+
+func NewIniExtender() Extender {
+	return &iniExtender{}
+}
+
 ////////////
 // Factories
 ////////////
@@ -452,6 +510,7 @@ var ExtenderFactories = map[ExtenderType]func() Extender{
 	RegexExtender:  NewRegexExtender,
 	JsonExtender:   NewJsonExtender,
 	TomlExtender:   NewTomlExtender,
+	IniExtender:    NewIniExtender,
 }
 
 func (path *ExtendedSegment) Extender(payload []byte) (Extender, error) {
