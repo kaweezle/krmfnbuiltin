@@ -1,6 +1,11 @@
 package utils
 
-import "sigs.k8s.io/kustomize/api/resource"
+import (
+	"sigs.k8s.io/kustomize/api/resource"
+	"sigs.k8s.io/kustomize/kyaml/kio/filters"
+	"sigs.k8s.io/kustomize/kyaml/kio/kioutil"
+	"sigs.k8s.io/kustomize/kyaml/yaml"
+)
 
 var buildAnnotations = []string{
 	BuildAnnotationPreviousKinds,
@@ -29,4 +34,16 @@ func RemoveBuildAnnotations(r *resource.Resource) {
 	if err := r.SetAnnotations(annotations); err != nil {
 		panic(err)
 	}
+}
+
+func MakeResourceLocal(r *yaml.RNode) error {
+	annotations := r.GetAnnotations()
+
+	annotations[filters.LocalConfigAnnotation] = "true"
+	annotations[kioutil.PathAnnotation] = ".generated.yaml"
+	annotations[kioutil.LegacyPathAnnotation] = ".generated.yaml"
+	delete(annotations, FunctionAnnotationInjectLocal)
+	delete(annotations, FunctionAnnotationFunction)
+
+	return r.SetAnnotations(annotations)
 }

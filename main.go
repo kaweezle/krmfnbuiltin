@@ -13,7 +13,6 @@ import (
 	"sigs.k8s.io/kustomize/kyaml/fn/framework"
 	"sigs.k8s.io/kustomize/kyaml/fn/framework/command"
 	"sigs.k8s.io/kustomize/kyaml/kio/filters"
-	"sigs.k8s.io/kustomize/kyaml/kio/kioutil"
 	"sigs.k8s.io/kustomize/kyaml/resid"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 )
@@ -28,7 +27,20 @@ func main() {
 
 		plugin, err := plugins.MakeBuiltinPlugin(resid.GvkFromNode(config))
 		if err != nil {
-			return errors.WrapPrefixf(err, "creating plugin")
+			// Check if config asks us to inject it
+			if _, ok := config.GetAnnotations()[utils.FunctionAnnotationInjectLocal]; ok {
+				injected := config.Copy()
+
+				err := utils.MakeResourceLocal(injected)
+				if err != nil {
+					return errors.WrapPrefixf(
+						err, "Error while mangling annotations on %s fails configuration", res.OrgId())
+				}
+				rl.Items = append(rl.Items, injected)
+				return nil
+			} else {
+				return errors.WrapPrefixf(err, "creating plugin")
+			}
 		}
 
 		yamlNode := config.YNode()
@@ -68,7 +80,7 @@ func main() {
 			// As it always add a filename by default, the local resources keep saved.
 			// To avoid this, an annotation `config.kubernetes.io/prune-local` present in a
 			// transformer makes all the local resources disappear.
-			if _, ok := config.GetAnnotations()["config.kubernetes.io/prune-local"]; ok {
+			if _, ok := config.GetAnnotations()[utils.FunctionAnnotationPruneLocal]; ok {
 				filter := &filters.IsLocalConfig{IncludeLocalConfig: false, ExcludeNonLocalConfig: false}
 				err = rl.Filter(filter)
 				if err != nil {
@@ -95,9 +107,7 @@ func main() {
 				// do that on functions. So we have added a special annotation
 				// `config.kubernetes.io/prune-local` to add on the last transformer.
 				// We set the filename of the generated resource in case it is forgotten.
-				r.Pipe(yaml.SetAnnotation(filters.LocalConfigAnnotation, "true"))
-				r.Pipe(yaml.SetAnnotation(kioutil.PathAnnotation, ".generated.yaml"))
-				r.Pipe(yaml.SetAnnotation(kioutil.LegacyPathAnnotation, ".generated.yaml"))
+				utils.MakeResourceLocal(&r.RNode)
 			}
 
 			rl.Items = append(rl.Items, rm.ToRNodeSlice()...)
