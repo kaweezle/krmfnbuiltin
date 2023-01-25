@@ -5,8 +5,8 @@ import (
 	"os"
 
 	"github.com/kaweezle/krmfnbuiltin/pkg/plugins"
+	"github.com/kaweezle/krmfnbuiltin/pkg/utils"
 
-	"sigs.k8s.io/kustomize/api/konfig"
 	"sigs.k8s.io/kustomize/api/resmap"
 	"sigs.k8s.io/kustomize/api/resource"
 	"sigs.k8s.io/kustomize/kyaml/errors"
@@ -17,42 +17,6 @@ import (
 	"sigs.k8s.io/kustomize/kyaml/resid"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 )
-
-const (
-	// build annotations
-	BuildAnnotationPreviousKinds      = konfig.ConfigAnnoDomain + "/previousKinds"
-	BuildAnnotationPreviousNames      = konfig.ConfigAnnoDomain + "/previousNames"
-	BuildAnnotationPrefixes           = konfig.ConfigAnnoDomain + "/prefixes"
-	BuildAnnotationSuffixes           = konfig.ConfigAnnoDomain + "/suffixes"
-	BuildAnnotationPreviousNamespaces = konfig.ConfigAnnoDomain + "/previousNamespaces"
-	BuildAnnotationsRefBy             = konfig.ConfigAnnoDomain + "/refBy"
-	BuildAnnotationsGenBehavior       = konfig.ConfigAnnoDomain + "/generatorBehavior"
-	BuildAnnotationsGenAddHashSuffix  = konfig.ConfigAnnoDomain + "/needsHashSuffix"
-)
-
-var BuildAnnotations = []string{
-	BuildAnnotationPreviousKinds,
-	BuildAnnotationPreviousNames,
-	BuildAnnotationPrefixes,
-	BuildAnnotationSuffixes,
-	BuildAnnotationPreviousNamespaces,
-	BuildAnnotationsRefBy,
-	BuildAnnotationsGenBehavior,
-	BuildAnnotationsGenAddHashSuffix,
-}
-
-func RemoveBuildAnnotations(r *resource.Resource) {
-	annotations := r.GetAnnotations()
-	if len(annotations) == 0 {
-		return
-	}
-	for _, a := range BuildAnnotations {
-		delete(annotations, a)
-	}
-	if err := r.SetAnnotations(annotations); err != nil {
-		panic(err)
-	}
-}
 
 func main() {
 
@@ -95,7 +59,7 @@ func main() {
 			}
 
 			for _, r := range rm.Resources() {
-				RemoveBuildAnnotations(r)
+				utils.RemoveBuildAnnotations(r)
 			}
 
 			rl.Items = rm.ToRNodeSlice()

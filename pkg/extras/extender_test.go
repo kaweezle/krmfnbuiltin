@@ -252,11 +252,11 @@ common:
 	path := kyaml_utils.SmarterPathSplitter(p, ".")
 	e, err := NewExtendedPath(path)
 	require.NoError(err)
-	require.Len(e.resourcePath, 1, "no resource path")
+	require.Len(e.ResourcePath, 1, "no resource path")
 
 	sourcePath := []string{"common"}
 
-	target, err := source.Pipe(&yaml.PathGetter{Path: e.resourcePath})
+	target, err := source.Pipe(&yaml.PathGetter{Path: e.ResourcePath})
 	require.NoError(err)
 
 	value, err := replacement.Pipe(&yaml.PathGetter{Path: sourcePath})

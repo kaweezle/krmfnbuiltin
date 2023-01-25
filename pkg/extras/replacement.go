@@ -9,7 +9,7 @@ import (
 	"reflect"
 	"strings"
 
-	"sigs.k8s.io/kustomize/api/konfig"
+	"github.com/kaweezle/krmfnbuiltin/pkg/utils"
 	"sigs.k8s.io/kustomize/api/resmap"
 	"sigs.k8s.io/kustomize/api/resource"
 	"sigs.k8s.io/kustomize/api/types"
@@ -18,12 +18,12 @@ import (
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 )
 
-type Filter struct {
+type extendedFilter struct {
 	Replacements []types.Replacement `json:"replacements,omitempty" yaml:"replacements,omitempty"`
 }
 
 // Filter replaces values of targets with values from sources
-func (f Filter) Filter(nodes []*yaml.RNode) ([]*yaml.RNode, error) {
+func (f extendedFilter) Filter(nodes []*yaml.RNode) ([]*yaml.RNode, error) {
 	for i, r := range f.Replacements {
 		if r.Source == nil || r.Targets == nil {
 			return nil, fmt.Errorf("replacements must specify a source and at least one target")
@@ -67,7 +67,7 @@ func getReplacement(nodes []*yaml.RNode, r *types.Replacement) (*yaml.RNode, err
 func selectSourceNode(nodes []*yaml.RNode, selector *types.SourceSelector) (*yaml.RNode, error) {
 	var matches []*yaml.RNode
 	for _, n := range nodes {
-		ids, err := MakeResIds(n)
+		ids, err := makeResIds(n)
 		if err != nil {
 			return nil, fmt.Errorf("error getting node IDs: %w", err)
 		}
@@ -113,7 +113,7 @@ func applyReplacement(nodes []*yaml.RNode, value *yaml.RNode, targetSelectors []
 			selector.FieldPaths = []string{types.DefaultReplacementFieldPath}
 		}
 		for _, possibleTarget := range nodes {
-			ids, err := MakeResIds(possibleTarget)
+			ids, err := makeResIds(possibleTarget)
 			if err != nil {
 				return nil, err
 			}
@@ -186,21 +186,21 @@ func copyValueToTarget(target *yaml.RNode, value *yaml.RNode, selector *types.Ta
 		if err != nil {
 			return err
 		}
-		create, err := shouldCreateField(selector.Options, extendedPath.resourcePath)
+		create, err := shouldCreateField(selector.Options, extendedPath.ResourcePath)
 		if err != nil {
 			return err
 		}
 
 		var targetFields []*yaml.RNode
 		if create {
-			createdField, createErr := target.Pipe(yaml.LookupCreate(value.YNode().Kind, extendedPath.resourcePath...))
+			createdField, createErr := target.Pipe(yaml.LookupCreate(value.YNode().Kind, extendedPath.ResourcePath...))
 			if createErr != nil {
 				return fmt.Errorf("error creating replacement node: %w", createErr)
 			}
 			targetFields = append(targetFields, createdField)
 		} else {
 			// may return multiple fields, always wrapped in a sequence node
-			foundFieldSequence, lookupErr := target.Pipe(&yaml.PathMatcher{Path: extendedPath.resourcePath})
+			foundFieldSequence, lookupErr := target.Pipe(&yaml.PathMatcher{Path: extendedPath.ResourcePath})
 			if lookupErr != nil {
 				return fmt.Errorf("error finding field in replacement target: %w", lookupErr)
 			}
@@ -271,16 +271,8 @@ func shouldCreateField(options *types.FieldOptions, fieldPath []string) (bool, e
 
 // Copied
 
-const (
-	BuildAnnotationPreviousKinds      = konfig.ConfigAnnoDomain + "/previousKinds"
-	BuildAnnotationPreviousNames      = konfig.ConfigAnnoDomain + "/previousNames"
-	BuildAnnotationPrefixes           = konfig.ConfigAnnoDomain + "/prefixes"
-	BuildAnnotationSuffixes           = konfig.ConfigAnnoDomain + "/suffixes"
-	BuildAnnotationPreviousNamespaces = konfig.ConfigAnnoDomain + "/previousNamespaces"
-)
-
-// MakeResIds returns all of an RNode's current and previous Ids
-func MakeResIds(n *yaml.RNode) ([]resid.ResId, error) {
+// makeResIds returns all of an RNode's current and previous Ids
+func makeResIds(n *yaml.RNode) ([]resid.ResId, error) {
 	var result []resid.ResId
 	apiVersion := n.Field(yaml.APIVersionField)
 	var group, version string
@@ -290,7 +282,7 @@ func MakeResIds(n *yaml.RNode) ([]resid.ResId, error) {
 	result = append(result, resid.NewResIdWithNamespace(
 		resid.Gvk{Group: group, Version: version, Kind: n.GetKind()}, n.GetName(), n.GetNamespace()),
 	)
-	prevIds, err := PrevIds(n)
+	prevIds, err := prevIds(n)
 	if err != nil {
 		return nil, err
 	}
@@ -298,18 +290,18 @@ func MakeResIds(n *yaml.RNode) ([]resid.ResId, error) {
 	return result, nil
 }
 
-// PrevIds returns all of an RNode's previous Ids
-func PrevIds(n *yaml.RNode) ([]resid.ResId, error) {
+// prevIds returns all of an RNode's previous Ids
+func prevIds(n *yaml.RNode) ([]resid.ResId, error) {
 	var ids []resid.ResId
 	// TODO: merge previous names and namespaces into one list of
 	//     pairs on one annotation so there is no chance of error
 	annotations := n.GetAnnotations()
-	if _, ok := annotations[BuildAnnotationPreviousNames]; !ok {
+	if _, ok := annotations[utils.BuildAnnotationPreviousNames]; !ok {
 		return nil, nil
 	}
-	names := strings.Split(annotations[BuildAnnotationPreviousNames], ",")
-	ns := strings.Split(annotations[BuildAnnotationPreviousNamespaces], ",")
-	kinds := strings.Split(annotations[BuildAnnotationPreviousKinds], ",")
+	names := strings.Split(annotations[utils.BuildAnnotationPreviousNames], ",")
+	ns := strings.Split(annotations[utils.BuildAnnotationPreviousNamespaces], ",")
+	kinds := strings.Split(annotations[utils.BuildAnnotationPreviousKinds], ",")
 	// This should never happen
 	if len(names) != len(ns) || len(names) != len(kinds) {
 		return nil, fmt.Errorf(
@@ -336,12 +328,28 @@ func PrevIds(n *yaml.RNode) ([]resid.ResId, error) {
 
 // plugin
 
-// Replace values in targets with values from a source
+// Replace values in targets with values from a source. This transformer is
+// "extended" because it allows structured replacement in properties
+// containing a string representation of some structured content. It currently
+// supports the following structured formats:
+//
+//   - Yaml
+//   - Json
+//   - Toml
+//   - Ini
+//
+// It also provides helpers for changing content in base64 encoded properties
+// as well as a simple regexp based replacer for edge cases.
+//
+// Configuration of replacements can be found in the [kustomize doc].
+//
+// [kustomize doc]: https://kubectl.docs.kubernetes.io/references/kustomize/kustomization/replacements/
 type ExtendedReplacementTransformerPlugin struct {
 	ReplacementList []types.ReplacementField `json:"replacements,omitempty" yaml:"replacements,omitempty"`
 	Replacements    []types.Replacement      `json:"omitempty" yaml:"omitempty"`
 }
 
+// Config configures the plugin
 func (p *ExtendedReplacementTransformerPlugin) Config(
 	h *resmap.PluginHelpers, c []byte) (err error) {
 	p.ReplacementList = []types.ReplacementField{}
@@ -390,12 +398,14 @@ func (p *ExtendedReplacementTransformerPlugin) Config(
 	return nil
 }
 
+// Transform performs the configured replacements in the specified resource map
 func (p *ExtendedReplacementTransformerPlugin) Transform(m resmap.ResMap) (err error) {
-	return m.ApplyFilter(Filter{
+	return m.ApplyFilter(extendedFilter{
 		Replacements: p.Replacements,
 	})
 }
 
+// NewExtendedReplacementTransformerPlugin returns a newly created [ExtendedReplacementTransformerPlugin]
 func NewExtendedReplacementTransformerPlugin() resmap.TransformerPlugin {
 	return &ExtendedReplacementTransformerPlugin{}
 }
