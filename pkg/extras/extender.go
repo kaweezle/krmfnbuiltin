@@ -151,16 +151,16 @@ func (e *yamlExtender) SetPayload(payload []byte) (err error) {
 	return
 }
 
-// serializeNodes serialize nodes into YAML
-func serializeNodes(nodes []*yaml.RNode) ([]byte, error) {
+// serializeNode serialize one node into YAML
+func serializeNode(node *yaml.RNode) ([]byte, error) {
 	var b bytes.Buffer
-	err := (&kio.ByteWriter{Writer: &b}).Write(nodes)
+	err := (&kio.ByteWriter{Writer: &b}).Write([]*yaml.RNode{node})
 	return b.Bytes(), err
 }
 
 // GetPayload returns the current payload in the proper encoding
 func (e *yamlExtender) GetPayload() ([]byte, error) {
-	return serializeNodes([]*yaml.RNode{e.node})
+	return serializeNode(e.node)
 }
 
 // unwrapSeqNode unwraps node if it is a Wrapped Bare Seq Node
@@ -172,51 +172,69 @@ func unwrapSeqNode(node *yaml.RNode) *yaml.RNode {
 	return node
 }
 
-// Lookup looks for the specified path in node and return the matching nodes.
-func Lookup(node *yaml.RNode, path []string) ([]*yaml.RNode, error) {
+// Lookup looks for the specified path in node and return the matching node. If
+// kind is a valid node kind and the node doesn't exist, create it.
+func Lookup(node *yaml.RNode, path []string, kind yaml.Kind) (*yaml.RNode, error) {
 	// TODO: consider using yaml.PathGetter instead
-	node, err := unwrapSeqNode(node).Pipe(&yaml.PathMatcher{Path: path})
+	node, err := unwrapSeqNode(node).Pipe(&yaml.PathGetter{Path: path, Create: kind})
 	if err != nil {
 		return nil, errors.WrapPrefixf(err, "while getting path %s", strings.Join(path, "."))
 	}
 
-	return node.Elements()
+	return node, nil
 }
 
-// Get returns the encoded payload at the specified path
-func (e *yamlExtender) Get(path []string) ([]byte, error) {
-	targetFields, err := Lookup(e.node, path)
+// nodeSerializer is a RNode serializer function
+type nodeSerializer func(*yaml.RNode) ([]byte, error)
+
+// getNodePath returns the value of the node at path serialized with serializer.
+func getNodePath(node *yaml.RNode, path []string, serializer nodeSerializer) ([]byte, error) {
+	node, err := Lookup(node, path, 0)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching elements in replacement target: %w", err)
 	}
 
-	if len(targetFields) == 1 && targetFields[0].YNode().Kind == yaml.ScalarNode {
-		return []byte(targetFields[0].YNode().Value), nil
+	if node.YNode().Kind == yaml.ScalarNode {
+		return []byte(node.YNode().Value), nil
 	}
 
-	return serializeNodes(targetFields)
+	return serializer(node)
 }
 
-// Set modifies the current payload with value at the specified path.
-func (e *yamlExtender) Set(path []string, value any) error {
+// Get returns the encoded payload at the specified path
+func (e *yamlExtender) Get(path []string) ([]byte, error) {
+	return getNodePath(e.node, path, serializeNode)
+}
 
-	targetFields, err := Lookup(e.node, path)
+// setValue sets value at path on node
+func setValue(node *yaml.RNode, path []string, value any) error {
+
+	kind := yaml.ScalarNode
+	if v, ok := value.(*yaml.Node); ok {
+		kind = v.Kind
+	}
+
+	target, err := Lookup(node, path, kind)
 	if err != nil {
 		return fmt.Errorf("error fetching elements in replacement target: %w", err)
 	}
 
-	for _, t := range targetFields {
-		if t.YNode().Kind == yaml.ScalarNode {
-			t.YNode().Value = string(getByteValue(value))
+	if target.YNode().Kind == yaml.ScalarNode {
+		target.YNode().Value = string(getByteValue(value))
+	} else {
+		if target.YNode().Kind == kind {
+			v, _ := value.(*yaml.Node)
+			target.SetYNode(v)
 		} else {
-			if v, ok := value.(*yaml.Node); ok {
-				t.SetYNode(v)
-			} else {
-				return fmt.Errorf("setting non yaml object in place of object of type %s at path %s", t.YNode().Tag, strings.Join(path, "."))
-			}
+			return fmt.Errorf("setting non yaml object in place of object of type %s at path %s", target.YNode().Tag, strings.Join(path, "."))
 		}
 	}
 	return nil
+}
+
+// Set modifies the current payload with value at the specified path.
+func (e *yamlExtender) Set(path []string, value any) error {
+	return setValue(e.node, path, value)
 }
 
 // NewYamlExtender returns a newly created YAML [Extender].
@@ -436,43 +454,12 @@ func (e *jsonExtender) GetPayload() ([]byte, error) {
 
 // Get returns the sub JSON specified by path.
 func (e *jsonExtender) Get(path []string) ([]byte, error) {
-	targetFields, err := Lookup(e.node, path)
-	if err != nil {
-		return nil, errors.WrapPrefixf(err, "error fetching elements in replacement target")
-	}
-
-	if len(targetFields) > 1 {
-		return nil, fmt.Errorf("path %s returned %d items. Expected one", strings.Join(path, "."), len(targetFields))
-	}
-
-	target := targetFields[0]
-	if target.YNode().Kind == yaml.ScalarNode {
-		return []byte(target.YNode().Value), nil
-	}
-
-	return getJSONPayload(target)
+	return getNodePath(e.node, path, getJSONPayload)
 }
 
 // Set modifies the inner JSON at path with value
 func (e *jsonExtender) Set(path []string, value any) error {
-
-	targetFields, err := Lookup(e.node, path)
-	if err != nil {
-		return fmt.Errorf("error fetching elements in replacement target: %w", err)
-	}
-
-	for _, t := range targetFields {
-		if t.YNode().Kind == yaml.ScalarNode {
-			t.YNode().Value = string(getByteValue(value))
-		} else {
-			if v, ok := value.(*yaml.Node); ok {
-				t.SetYNode(v)
-			} else {
-				return fmt.Errorf("setting non json object in place of object of type %s at path %s", t.YNode().Tag, strings.Join(path, "."))
-			}
-		}
-	}
-	return nil
+	return setValue(e.node, path, value)
 }
 
 // NewJsonExtender returns a newly created [Extender] to modify JSON content.
@@ -528,43 +515,12 @@ func (e *tomlExtender) GetPayload() ([]byte, error) {
 
 // Get returns the TOML representation of the sub element at path.
 func (e *tomlExtender) Get(path []string) ([]byte, error) {
-	targetFields, err := Lookup(e.node, path)
-	if err != nil {
-		return nil, errors.WrapPrefixf(err, "error fetching elements in replacement target")
-	}
-
-	if len(targetFields) > 1 {
-		return nil, fmt.Errorf("path %s returned %d items. Expected one", strings.Join(path, "."), len(targetFields))
-	}
-
-	target := targetFields[0]
-	if target.YNode().Kind == yaml.ScalarNode {
-		return []byte(target.YNode().Value), nil
-	}
-
-	return getTOMLPayload(target)
+	return getNodePath(e.node, path, getTOMLPayload)
 }
 
 // Set modifies the current payload at path with value.
 func (e *tomlExtender) Set(path []string, value any) error {
-
-	targetFields, err := Lookup(e.node, path)
-	if err != nil {
-		return fmt.Errorf("error fetching elements in replacement target: %w", err)
-	}
-
-	for _, t := range targetFields {
-		if t.YNode().Kind == yaml.ScalarNode {
-			t.YNode().Value = string(getByteValue(value))
-		} else {
-			if v, ok := value.(*yaml.Node); ok {
-				t.SetYNode(v)
-			} else {
-				return fmt.Errorf("setting non toml object in place of object of type %s at path %s", t.YNode().Tag, strings.Join(path, "."))
-			}
-		}
-	}
-	return nil
+	return setValue(e.node, path, value)
 }
 
 // NewTomlExtender returns a newly created [Extender] for modifying properties

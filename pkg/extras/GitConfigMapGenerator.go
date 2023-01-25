@@ -11,7 +11,7 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-// GitConfigMapGeneratorPlugin Generates a config map that includes two
+// GitConfigMapGeneratorPlugin generates a config map that includes two
 // properties of the current git repository:
 //
 //   - repoURL contains the URL or the remote specified by remoteName. by
