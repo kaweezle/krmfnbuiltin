@@ -1,0 +1,62 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: traefik
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  destination:
+    namespace: traefik
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    chart: traefik
+    helm:
+      parameters: []
+      values: |
+        ingressClass:
+          enabled: true
+          isDefaultClass: true
+        ingressRoute:
+          dashboard:
+            enabled: true
+        providers:
+          kubernetesCRD:
+            allowCrossNamespace: true
+            allowExternalNameServices: true
+          kubernetesIngress:
+            allowExternalNameServices: true
+            publishedService:
+              enabled: true
+        logs:
+          general:
+            level: ERROR
+          access:
+            enabled: true
+        tracing:
+          instana: false
+        gobalArguments: {}
+        # BEWARE: use only for debugging
+        additionalArguments:
+        - --api.insecure=false
+        ports:
+          # BEWARE: use only for debugging
+          # traefik:
+          #   expose: false
+          web:
+            redirectTo: websecure
+          websecure:
+            tls:
+              enabled: true
+          traefik:
+            expose: true
+    repoURL: https://helm.traefik.io/traefik
+    targetRevision: "10.19.5"
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+  ignoreDifferences: []

@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sish-client
+  namespace: traefik
+  labels:
+    app.kubernetes.io/name: "sish-client"
+    app.kubernetes.io/component: edge
+    app.kubernetes.io/part-of: autocloud
+data:
+  config: |
+    PubkeyAcceptedKeyTypes +ssh-rsa
+    Host sishserver
+      HostName target.link
+      Port 2222
+      BatchMode yes
+      IdentityFile ~/.ssh_keys/id_rsa
+      IdentitiesOnly yes
+      LogLevel ERROR
+      ServerAliveInterval 10
+      ServerAliveCountMax 2
+      RemoteCommand sni-proxy=true
+      RemoteForward myhost.target.link:443 traefik.traefik.svc:443
+  known_hosts: |
+    [target.link]:2222 ssh-ed25519 AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAID+4/eqtPTLC18TE8ZP7NeF4ZP68/wnY2d7mhH/KVs79AAAABHNzaDo=

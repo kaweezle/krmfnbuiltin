@@ -1,0 +1,26 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sish-client
+  namespace: traefik
+  labels:
+    app.kubernetes.io/name: "sish-client"
+    app.kubernetes.io/component: edge
+    app.kubernetes.io/part-of: autocloud
+data:
+  config: |
+    PubkeyAcceptedKeyTypes +ssh-rsa
+    Host sishserver
+      HostName holepunch.in
+      Port 2222
+      BatchMode yes
+      IdentityFile ~/.ssh_keys/id_rsa
+      IdentitiesOnly yes
+      LogLevel ERROR
+      ServerAliveInterval 10
+      ServerAliveCountMax 2
+      RemoteCommand sni-proxy=true
+      RemoteForward citest.holepunch.in:443 traefik.traefik.svc:443
+  known_hosts: |
+    [holepunch.in]:2222 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAID+3abW2y3T5dodnI5O1Z/2KlIdH3bwnbGDvCFf13zlh

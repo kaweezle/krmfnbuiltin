@@ -1,0 +1,74 @@
+apiVersion: builtin
+kind: LocalConfiguration
+metadata:
+  name: configuration-map
+  annotations:
+    config.kaweezle.com/inject-local: "true"
+    config.kubernetes.io/function: |
+      exec:
+        path: ../../krmfnbuiltin
+data:
+  sish:
+    server: target.link
+    hostname: myhost.target.link
+    host_key: AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAID+4/eqtPTLC18TE8ZP7NeF4ZP68/wnY2d7mhH/KVs79AAAABHNzaDo=
+  traefik:
+    dashboard_enabled: true
+    expose: true
+---
+apiVersion: builtin
+kind: ReplacementTransformer
+metadata:
+  name: replacement-transformer
+  annotations:
+    config.kubernetes.io/prune-local: "true"
+    config.kubernetes.io/function: |
+      exec:
+        path: ../../krmfnbuiltin
+replacements:
+  - source:
+      kind: LocalConfiguration
+      fieldPath: data.sish.server
+    targets:
+      - select:
+          kind: ConfigMap
+          name: sish-client
+        fieldPaths:
+          - data.config.!!regex.^\s+HostName\s+(\S+)\s*$.1
+          - data.known_hosts.!!regex.^\[(\S+)\].1
+  - source:
+      kind: LocalConfiguration
+      fieldPath: data.sish.hostname
+    targets:
+      - select:
+          kind: ConfigMap
+          name: sish-client
+        fieldPaths:
+          - data.config.!!regex.^\s+RemoteForward\s+(\S+):.1
+  - source:
+      kind: LocalConfiguration
+      fieldPath: data.sish.host_key
+    targets:
+      - select:
+          kind: ConfigMap
+          name: sish-client
+        fieldPaths:
+          - data.known_hosts.!!regex.ssh-ed25519\s(\S+).1
+  - source:
+      kind: LocalConfiguration
+      fieldPath: data.traefik.dashboard_enabled
+    targets:
+      - select:
+          kind: Application
+          name: traefik
+        fieldPaths:
+          - spec.source.helm.values.!!yaml.ingressRoute.dashboard.enabled
+  - source:
+      kind: LocalConfiguration
+      fieldPath: data.traefik.expose
+    targets:
+      - select:
+          kind: Application
+          name: traefik
+        fieldPaths:
+          - spec.source.helm.values.!!yaml.ports.traefik.expose
