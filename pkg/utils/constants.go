@@ -17,6 +17,8 @@ const (
 	// annotations
 	ConfigurationAnnotationDomain = "config.kubernetes.io"
 
+	LocalConfigurationAnnotationDomain = "config.kaweezle.com"
+
 	// Function configuration annotation
 	FunctionAnnotationFunction = ConfigurationAnnotationDomain + "/function"
 
@@ -25,8 +27,12 @@ const (
 
 	// Setting to true means we want this function configuration to be injected as a
 	// local configuration resource (local-config)
-	FunctionAnnotationInjectLocal = ConfigurationAnnotationDomain + "/inject-local"
+	FunctionAnnotationInjectLocal = LocalConfigurationAnnotationDomain + "/inject-local"
 
 	// if set, the transformation will remove all the resources marked as local-config
-	FunctionAnnotationPruneLocal = ConfigurationAnnotationDomain + "/prune-local"
+	FunctionAnnotationPruneLocal = LocalConfigurationAnnotationDomain + "/prune-local"
+	// if set on a Generated resource, it won't be pruned
+	FunctionAnnotationKeepLocal = LocalConfigurationAnnotationDomain + "/keep-local"
+	FunctionAnnotationPath      = LocalConfigurationAnnotationDomain + "/path"
+	FunctionAnnotationIndex     = LocalConfigurationAnnotationDomain + "/index"
 )

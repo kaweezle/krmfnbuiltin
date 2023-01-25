@@ -78,9 +78,13 @@ func main() {
 
 			// kustomize fn don't remove config.kubernetes.io/local-config resources upon completion.
 			// As it always add a filename by default, the local resources keep saved.
-			// To avoid this, an annotation `config.kubernetes.io/prune-local` present in a
+			// To avoid this, an annotation `config.kaweezle.com/prune-local` present in a
 			// transformer makes all the local resources disappear.
 			if _, ok := config.GetAnnotations()[utils.FunctionAnnotationPruneLocal]; ok {
+				err = rl.Filter(utils.UnLocal)
+				if err != nil {
+					return errors.WrapPrefixf(err, "Removing local from keep-local resources")
+				}
 				filter := &filters.IsLocalConfig{IncludeLocalConfig: false, ExcludeNonLocalConfig: false}
 				err = rl.Filter(filter)
 				if err != nil {
@@ -101,11 +105,11 @@ func main() {
 			}
 
 			for _, r := range rm.Resources() {
-				r.RemoveBuildAnnotations()
+				utils.RemoveBuildAnnotations(r)
 				// We add the annotation config.kubernetes.io/local-config to be able to delete
 				// The generated resource at the end of the process. Unfortunately, kustomize doesn't
 				// do that on functions. So we have added a special annotation
-				// `config.kubernetes.io/prune-local` to add on the last transformer.
+				// `config.kaweezle.com/prune-local` to add on the last transformer.
 				// We set the filename of the generated resource in case it is forgotten.
 				utils.MakeResourceLocal(&r.RNode)
 			}
