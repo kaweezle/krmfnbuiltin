@@ -4,6 +4,7 @@ metadata:
   name: configuration-map
   annotations:
     config.kaweezle.com/inject-local: "true"
+    config.kaweezle.com/local-config: "true"
     config.kubernetes.io/function: |
       exec:
         path: ../../krmfnbuiltin

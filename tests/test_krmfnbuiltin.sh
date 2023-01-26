@@ -9,7 +9,6 @@ set -e pipefail
 
 trap "find . -type d -name 'applications' -exec rm -rf {} +" EXIT
 
-
 for d in $(ls -d */); do
     echo "Running Test in $d..."
     cd $d
@@ -17,7 +16,7 @@ for d in $(ls -d */); do
     cp -r original applications
     echo "  > Performing kustomizations..."
     kustomize fn run --enable-exec --fn-path functions applications
-    for f in $(ls -1 expected); do
+    for f in $(ls -1 applications); do
         echo "  > Checking $f..."
         diff <(yq eval -P expected/$f) <(yq eval -P applications/$f)
     done
