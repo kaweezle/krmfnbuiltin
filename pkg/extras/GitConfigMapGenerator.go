@@ -11,13 +11,28 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+// GitConfigMapGeneratorPlugin generates a config map that includes two
+// properties of the current git repository:
+//
+//   - repoURL contains the URL or the remote specified by remoteName. by
+//     default, it takes the URL of the remote named "origin".
+//   - targetRevision contains the name of the current branch.
+//
+// This generator is useful in transformations that use those values, like for
+// instance Argo CD application customization.
+//
+// Information about the configuration can be found in the [kustomize doc].
+//
+// [kustomize doc]: https://kubectl.docs.kubernetes.io/references/kustomize/builtins/#_configmapgenerator_
 type GitConfigMapGeneratorPlugin struct {
 	h                *resmap.PluginHelpers
 	types.ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	types.ConfigMapArgs
+	// The name of the remote which URL to include. defaults to "origin".
 	RemoteName string `json:"remoteName,omitempty" yaml:"remoteName,omitempty"`
 }
 
+// Config configures the generator with the functionConfig passed in config.
 func (p *GitConfigMapGeneratorPlugin) Config(h *resmap.PluginHelpers, config []byte) (err error) {
 	p.ConfigMapArgs = types.ConfigMapArgs{}
 	err = yaml.Unmarshal(config, p)
@@ -31,6 +46,7 @@ func (p *GitConfigMapGeneratorPlugin) Config(h *resmap.PluginHelpers, config []b
 	return
 }
 
+// Generate generates the config map
 func (p *GitConfigMapGeneratorPlugin) Generate() (resmap.ResMap, error) {
 	// Add git repository properties
 
@@ -63,6 +79,7 @@ func (p *GitConfigMapGeneratorPlugin) Generate() (resmap.ResMap, error) {
 		kv.NewLoader(p.h.Loader(), p.h.Validator()), p.ConfigMapArgs)
 }
 
+// NewGitConfigMapGeneratorPlugin returns a newly created GitConfigMapGenerator.
 func NewGitConfigMapGeneratorPlugin() resmap.GeneratorPlugin {
 	return &GitConfigMapGeneratorPlugin{}
 }

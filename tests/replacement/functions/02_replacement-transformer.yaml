@@ -4,10 +4,10 @@ metadata:
   name: replacement-transformer
   namespace: argocd
   annotations:
-    config.kubernetes.io/prune-local: "true"
+    config.kaweezle.com/prune-local: "true"
     config.kubernetes.io/function: |
       exec:
-        path: ../krmfnbuiltin
+        path: ../../krmfnbuiltin
 replacements:
   - source:
       kind: ConfigMap
@@ -19,6 +19,7 @@ replacements:
         fieldPaths:
           - spec.source.repoURL
           - spec.source.helm.parameters.[name=common.repoURL].value
+          - spec.source.helm.values.!!yaml.common.repoURL
   - source:
       kind: ConfigMap
       fieldPath: data.targetRevision
@@ -29,3 +30,4 @@ replacements:
         fieldPaths:
           - spec.source.targetRevision
           - spec.source.helm.parameters.[name=common.targetRevision].value
+          - spec.source.helm.values.!!yaml.common.targetRevision

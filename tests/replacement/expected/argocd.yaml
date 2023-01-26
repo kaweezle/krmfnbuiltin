@@ -1,0 +1,41 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argo-cd
+  namespace: argocd
+  annotations:
+    autocloud/local: "true"
+spec:
+  destination:
+    namespace: argocd
+    server: https://kubernetes.default.svc
+  ignoreDifferences:
+    - group: argoproj.io
+      jsonPointers:
+        - /status
+      kind: Application
+  project: default
+  source:
+    path: packages/argocd
+    repoURL: https://github.com/antoinemartin/autocloud.git
+    targetRevision: deploy/citest
+    helm:
+      parameters:
+        - name: common.targetRevision
+          value: deploy/citest
+        - name: common.repoURL
+          value: https://github.com/antoinemartin/autocloud.git
+      values: |
+        uninode: true
+        apps:
+          enabled: true
+        common:
+          targetRevision: deploy/citest
+          repoURL: https://github.com/antoinemartin/autocloud.git
+  syncPolicy:
+    automated:
+      allowEmpty: true
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

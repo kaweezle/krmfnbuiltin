@@ -8,7 +8,7 @@ metadata:
   annotations:
     config.kubernetes.io/function: |
       exec:
-        path: ../krmfnbuiltin
+        path: ../../krmfnbuiltin
 # When using GitConfigMapGenerator, these are automatically injected
 literals:
   - repoURL=https://github.com/antoinemartin/autocloud.git

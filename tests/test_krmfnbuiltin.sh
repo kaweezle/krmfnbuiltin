@@ -1,21 +1,26 @@
 #!/bin/bash
 
 # DEPENDENCEIS
-# sops
 # kustomize
-# age
 # yq
 
 #set -uexo pipefail
 set -e pipefail
 
-trap "cp compare/argocd.original.yaml applications/argocd.yaml" EXIT
+trap "find . -type d -name 'applications' -exec rm -rf {} +" EXIT
 
-echo "Running kustomize with patch transformer..."
-kustomize fn run --enable-exec --fn-path functions applications
-diff <(yq eval -P compare/argocd.expected.yaml) <(yq eval -P applications/argocd.yaml)
-cp compare/argocd.original.yaml applications/argocd.yaml
-echo "Running kustomize with replacement transformer..."
-kustomize fn run --enable-exec --fn-path functions2 applications
-diff <(yq eval -P compare/argocd.expected.yaml) <(yq eval -P applications/argocd.yaml)
+
+for d in $(ls -d */); do
+    echo "Running Test in $d..."
+    cd $d
+    rm -rf applications
+    cp -r original applications
+    echo "  > Performing kustomizations..."
+    kustomize fn run --enable-exec --fn-path functions applications
+    for f in $(ls -1 expected); do
+        echo "  > Checking $f..."
+        diff <(yq eval -P expected/$f) <(yq eval -P applications/$f)
+    done
+    cd ..
+done
 echo "Done ok 🎉"
