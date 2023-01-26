@@ -1,0 +1,17 @@
+apiVersion: builtin
+kind: LocalConfiguration
+metadata:
+  name: configuration-map
+  annotations:
+    config.kaweezle.com/inject-local: "true"
+    config.kubernetes.io/function: |
+      exec:
+        path: ../../krmfnbuiltin
+data:
+  sish:
+    server: target.link
+    hostname: myhost.target.link
+    host_key: AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAID+4/eqtPTLC18TE8ZP7NeF4ZP68/wnY2d7mhH/KVs79AAAABHNzaDo=
+  traefik:
+    dashboard_enabled: true
+    expose: true
