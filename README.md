@@ -19,8 +19,9 @@ transformation in your kustomize projects.
     <li><a href="#keeping-or-deleting-generated-resources">Keeping or deleting generated resources</a></li>
     <li><a href="#extensions">Extensions</a>
         <ul>
-            <li><a href="#heredoc-generator">Heredoc generator</a></li>
+            <li><a href="#remove-transformer">Remove Transformer</a></li>
             <li><a href="#configmap-generator-with-git-properties">ConfigMap generator with git properties</a></li>
+            <li><a href="#heredoc-generator">Heredoc generator</a></li>
             <li><a href="#extended-replacement-in-structured-content">Extended replacement in structured content</a></li>
         </ul>
     </li>
@@ -171,7 +172,7 @@ applications.
 
 ## Use of generators
 
-`krmfnbuiltin` provides all the
+`krmfnbuiltin` provides all the Kustomize
 [builtin generators](https://kubectl.docs.kubernetes.io/references/kustomize/builtins/).
 
 Let's imagine that one or more of your applications use an Helm chart that in
@@ -221,6 +222,8 @@ kind: ConfigMapGenerator
 metadata:
   name: configuration-map
   annotations:
+    # This annotation will be transferred to the generated ConfigMap
+    config.kaweezle.com/local-config: "true"
     config.kubernetes.io/function: |
       exec:
         path: krmfnbuiltin
@@ -240,7 +243,7 @@ metadata:
   name: replacement-transformer
   namespace: argocd
   annotations:
-    # Put this annotation in the last transformation to remove generated resources
+    # Put this annotation in the last transformation to remove the generated resource
     config.kaweezle.com/prune-local: "true"
     config.kubernetes.io/function: |
       exec:
@@ -278,40 +281,57 @@ Some remarks:
   survive reordering.
 - ✔️ The functions file names are prefixed with a number prefix (`01_`, `02_`)
   in order to ensure that the functions are executed in the right order. Note
-  that you can group the two functions in one file separated by `---`.
+  that you can group the two functions in one file separated by `---` (this
+  would make it unusable from [kpt] though).
+- ✔️ The generators contains the annotation:
+
+  ```yaml
+  config.kaweezle.com/local-config: "true"
+  ```
+
+  that is injected in the generated resource.
+
 - ✔️ In the last transformation, we add the following annotation:
 
   ```yaml
   config.kaweezle.com/prune-local: "true"
   ```
 
-  In order to avoid saving the generated resources. This is due to an issue in
-  kustomize that doesn't filter out resources annotated with
-  `config.kubernetes.io/local-config` in the case you are using
-  `kustomize fn run` (although it works with `kustomize build`).
+  In order to avoid saving the generated resources. In the presence of this
+  annotation, `krmfnbuiltin` will remove all the resource having the
+  `config.kaweezle.com/local-config` annotation.
 
 ## Keeping or deleting generated resources
 
-As said above, generated resources are saved by default beside being marked with
-the `config.kubernetes.io/local-config` annotation. To prevent that, adding:
+As said above, generated resources are saved by default. To prevent that,
+adding:
+
+```yaml
+config.kaweezle.com/local-config: "true"
+```
+
+on the generators and:
 
 ```yaml
 config.kaweezle.com/prune-local: "true"
 ```
 
-On the last transformation will remove those resources. If the annotation is not
-present, all the generated resources will be saved in a file named
-`.generated.yaml` located in the configuration directory. You may want to add
+On the last transformation will remove those resources. If the absence of these
+annotations, the generated resources will be saved in a file named
+`.krmfnbuiltin.yaml` located in the configuration directory. You may want to add
 this file name to your `.gitignore` file in order to avoid committing it.
 
 In some cases however, we want to _inject_ new resources in the configuration.
-This can be done by adding the following annotations to the generator:
+This can be done by just omitting the `config.kaweezle.com/local-config`
+annotation.
 
-- `config.kaweezle.com/keep-local` prevents the deletion of the resource when
-  reaching the transformation annotated with `config.kaweezle.com/prune-local`.
-- `config.kaweezle.com/path` allows specifying the filename of the saved file.
-- `config.kaweezle.com/index` allows specifying the position of the resource in
-  the file.
+The name of the file containing the generated resources can be set with the
+following annotations:
+
+- `config.kaweezle.com/path` for the filename. If it contains directories, they
+  will be created.
+- `config.kaweezle.com/index` For the starting index of the resources in the
+  file.
 
 Example:
 
@@ -321,7 +341,7 @@ kind: ConfigMapGenerator
 metadata:
   name: configuration-map
   annotations:
-    config.kaweezle.com/keep-local: "true"
+    # config.kaweezle.com/local-config: "true"
     config.kaweezle.com/path: local-config.yaml
     config.kubernetes.io/function: |
       exec:
@@ -332,6 +352,33 @@ With these annotations, the generated config map will be saved in the
 `local-config.yaml` file in the configuration directory.
 
 ## Extensions
+
+### Remove Transformer
+
+In the case the transformation(s) involves other transformers than
+`krmfnbuiltin`, the `config.kaweezle.com/prune-local` may not be available to
+remove resources injected in the transformation pipeline. For this use case,
+`krmfnbuiltin` provides `RemoveTransformer`:
+
+```yaml
+apiVersion: builtin
+kind: RemoveTransformer
+metadata:
+  name: replacement-transformer
+  annotations:
+    config.kubernetes.io/function: |
+      exec:
+        path: ../../krmfnbuiltin
+targets:
+  - annotationSelector: config.kaweezle.com/local-config
+```
+
+Each target specified in the `targets` field follows the
+[patches target convention](https://kubectl.docs.kubernetes.io/references/kustomize/builtins/#field-name-patches).
+
+Note that you can use the Kustomize recommended method with a
+`PatchStrategicMergeTransformer` and a `$patch: delete` field. The above
+transformation is however more explicit.
 
 ### ConfigMap generator with git properties
 
@@ -533,6 +580,7 @@ metadata:
     # This will inject this resource. like a ConfigMapGenerator, but with hierarchical
     # properties
     config.kaweezle.com/inject-local: "true"
+    config.kaweezle.com/local-config: "true"
     config.kubernetes.io/function: |
       exec:
         path: krmfnbuiltin
@@ -684,6 +732,7 @@ metadata:
   name: configuration-map
   annotations:
     config.kaweezle.com/inject-local: "true"
+    config.kaweezle.com/local-config: "true"
     config.kubernetes.io/function: |
       exec:
         path: ../../krmfnbuiltin
@@ -842,7 +891,8 @@ this model, a generator or a transformer along its parameters in much like a
 line in a dockerfile. It takes a current configuration as source and generates a
 new configuration after transformation.
 
-While it has not been tested, krmfnbuiltin should work with [kpt].
+krmfnbuiltin works with [kpt]. The `tests/test_krmfnbuiltin_kpt.sh` script
+perform the basic tests with kpt.
 
 [knot8] lenses have provided the idea of extended paths.
 
