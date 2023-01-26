@@ -23,7 +23,7 @@ const (
 	FunctionAnnotationFunction = ConfigurationAnnotationDomain + "/function"
 
 	// true when the resource is part of the local configuration
-	FunctionAnnotationLocalConfig = ConfigurationAnnotationDomain + "/local-config"
+	FunctionAnnotationLocalConfig = LocalConfigurationAnnotationDomain + "/local-config"
 
 	// Setting to true means we want this function configuration to be injected as a
 	// local configuration resource (local-config)

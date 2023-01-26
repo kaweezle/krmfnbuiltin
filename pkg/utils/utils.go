@@ -3,7 +3,6 @@ package utils
 import (
 	"sigs.k8s.io/kustomize/api/resource"
 	"sigs.k8s.io/kustomize/kyaml/kio"
-	"sigs.k8s.io/kustomize/kyaml/kio/filters"
 	"sigs.k8s.io/kustomize/kyaml/kio/kioutil"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 )
@@ -40,7 +39,7 @@ func RemoveBuildAnnotations(r *resource.Resource) {
 func MakeResourceLocal(r *yaml.RNode) error {
 	annotations := r.GetAnnotations()
 
-	annotations[filters.LocalConfigAnnotation] = "true"
+	annotations[FunctionAnnotationLocalConfig] = "true"
 	if _, ok := annotations[kioutil.PathAnnotation]; !ok {
 		annotations[kioutil.PathAnnotation] = ".generated.yaml"
 	}
@@ -54,6 +53,7 @@ func MakeResourceLocal(r *yaml.RNode) error {
 }
 
 func unLocal(list []*yaml.RNode) ([]*yaml.RNode, error) {
+	output := []*yaml.RNode{}
 	for _, r := range list {
 		annotations := r.GetAnnotations()
 		if _, ok := annotations[FunctionAnnotationKeepLocal]; ok {
@@ -70,9 +70,14 @@ func unLocal(list []*yaml.RNode) ([]*yaml.RNode, error) {
 				delete(annotations, FunctionAnnotationIndex)
 			}
 			r.SetAnnotations(annotations)
+			output = append(output, r)
+		} else {
+			if _, ok := annotations[FunctionAnnotationLocalConfig]; !ok {
+				output = append(output, r)
+			}
 		}
 	}
-	return list, nil
+	return output, nil
 }
 
 var UnLocal kio.FilterFunc = unLocal

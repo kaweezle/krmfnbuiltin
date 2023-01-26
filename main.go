@@ -12,7 +12,6 @@ import (
 	"sigs.k8s.io/kustomize/kyaml/errors"
 	"sigs.k8s.io/kustomize/kyaml/fn/framework"
 	"sigs.k8s.io/kustomize/kyaml/fn/framework/command"
-	"sigs.k8s.io/kustomize/kyaml/kio/filters"
 	"sigs.k8s.io/kustomize/kyaml/resid"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 )
@@ -84,11 +83,6 @@ func main() {
 				err = rl.Filter(utils.UnLocal)
 				if err != nil {
 					return errors.WrapPrefixf(err, "Removing local from keep-local resources")
-				}
-				filter := &filters.IsLocalConfig{IncludeLocalConfig: false, ExcludeNonLocalConfig: false}
-				err = rl.Filter(filter)
-				if err != nil {
-					return errors.WrapPrefixf(err, "filtering local configs")
 				}
 			}
 
