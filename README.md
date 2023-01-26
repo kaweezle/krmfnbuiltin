@@ -134,7 +134,7 @@ metadata:
         path: krmfnbuiltin
     # Can also be:
     #  container:
-    #    image: ghcr.io/kaweezle/krmfnbuiltin:v0.2.0
+    #    image: ghcr.io/kaweezle/krmfnbuiltin:v0.3.0
 patch: |-
   - op: replace
       path: /spec/source/repoURL
@@ -824,7 +824,7 @@ curl -sLS https://raw.githubusercontent.com/kaweezle/krmfnbuiltin/main/get.sh | 
 If you don't want to pipe into shell, you can do:
 
 ```console
-> KRMFNBUILTIN_VERSION="v0.2.0"
+> KRMFNBUILTIN_VERSION="v0.3.0"
 > curl -sLo /usr/local/bin/krmfnbuiltin https://github.com/kaweezle/krmfnbuiltin/releases/download/${KRMFNBUILTIN_VERSION}/krmfnbuiltin_${KRMFNBUILTIN_VERSION}_linux_amd64
 ```
 
@@ -853,7 +853,7 @@ summarize:
 ```Dockerfile
 FROM argoproj/argocd:latest
 
-ARG KRMFNBUILTIN_VERSION=v0.2.0
+ARG KRMFNBUILTIN_VERSION=v0.3.0
 
 # Switch to root for the ability to perform install
 USER root
