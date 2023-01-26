@@ -3,7 +3,7 @@ kind: ReplacementTransformer
 metadata:
   name: replacement-transformer
   annotations:
-    config.kubernetes.io/prune-local: "true"
+    ## config.kaweezle.com/prune-local: "true"
     config.kubernetes.io/function: |
       exec:
         path: ../../krmfnbuiltin

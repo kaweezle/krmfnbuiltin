@@ -38,6 +38,7 @@ const (
 	HelmChartInflationGenerator
 	ReplacementTransformer
 	GitConfigMapGenerator
+	RemoveTransformer
 )
 
 var stringToBuiltinPluginTypeMap map[string]BuiltinPluginType
@@ -109,6 +110,7 @@ var TransformerFactories = map[BuiltinPluginType]func() resmap.TransformerPlugin
 	ReplacementTransformer:         extras.NewExtendedReplacementTransformerPlugin,
 	ReplicaCountTransformer:        builtins.NewReplicaCountTransformerPlugin,
 	ValueAddTransformer:            builtins.NewValueAddTransformerPlugin,
+	RemoveTransformer:              extras.NewRemoveTransformerPlugin,
 	// Do not wired SortOrderTransformer as a builtin plugin.
 	// We only want it to be available in the top-level kustomization.
 	// See: https://github.com/kubernetes-sigs/kustomize/issues/3913

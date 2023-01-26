@@ -1,0 +1,10 @@
+apiVersion: builtin
+kind: RemoveTransformer
+metadata:
+  name: replacement-transformer
+  annotations:
+    config.kubernetes.io/function: |
+      exec:
+        path: ../../krmfnbuiltin
+targets:
+  - annotationSelector: config.kaweezle.com/local-config
