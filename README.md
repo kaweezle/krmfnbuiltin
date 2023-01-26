@@ -764,8 +764,15 @@ will become
 ## Installation
 
 With each [Release](https://github.com/kaweezle/krmfnbuiltin/releases), we
-provide binaries for most platforms as well as Alpine based packages. Typically,
-you would install it on linux with the following command:
+provide binaries for most platforms as well as Alpine based packages.
+
+On POSIX systems (Linux and Mac), you can install the last version with:
+
+```console
+curl -sLS https://raw.githubusercontent.com/kaweezle/krmfnbuiltin/main/get.sh | /bin/sh
+```
+
+If you don't want to pipe into shell, you can do:
 
 ```console
 > KRMFNBUILTIN_VERSION="v0.2.0"

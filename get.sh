@@ -1,0 +1,208 @@
+#!/usr/bin/env sh
+
+# Adapted from https://github.com/alexellis/k3sup/blob/master/get.sh.
+# See https://github.com/alexellis/k3sup/LICENSE
+#########################
+# Repo specific content #
+#########################
+
+export VERIFY_CHECKSUM=1
+export ALIAS_NAME=""
+export OWNER=kaweezle
+export REPO=krmfnbuiltin
+export BINLOCATION="/usr/local/bin"
+export SUCCESS_CMD="$BINLOCATION/$REPO --version"
+
+###############################
+# Content common across repos #
+###############################
+
+version=$(curl -sI https://github.com/$OWNER/$REPO/releases/latest | grep -i "location:" | awk -F"/" '{ printf "%s", $NF }' | tr -d '\r')
+if [ ! $version ]; then
+    echo "Failed while attempting to install $REPO. Please manually install:"
+    echo ""
+    echo "1. Open your web browser and go to https://github.com/$OWNER/$REPO/releases"
+    echo "2. Download the latest release for your platform. Call it '$REPO'."
+    echo "3. chmod +x ./$REPO"
+    echo "4. mv ./$REPO $BINLOCATION"
+    if [ -n "$ALIAS_NAME" ]; then
+        echo "5. ln -sf $BINLOCATION/$REPO /usr/local/bin/$ALIAS_NAME"
+    fi
+    exit 1
+fi
+
+hasCli() {
+
+    hasCurl=$(which curl)
+    if [ "$?" = "1" ]; then
+        echo "You need curl to use this script."
+        exit 1
+    fi
+}
+
+checkHash() {
+
+    sha_cmd="sha256sum"
+
+    if [ ! -x "$(command -v $sha_cmd)" ]; then
+        sha_cmd="shasum -a 256"
+    fi
+
+    if [ -x "$(command -v $sha_cmd)" ]; then
+
+        targetFileDir=${targetFile%/*}
+        sha_url="https://github.com/$OWNER/$REPO/releases/download/$version/SHA256SUMS"
+
+        (cd "$targetFileDir" && curl -sSL $sha_url | grep $fileName | $sha_cmd -c >/dev/null)
+
+        if [ "$?" != "0" ]; then
+            rm "$targetFile"
+            echo "Binary checksum didn't match. Exiting"
+        fi
+    fi
+}
+
+getPackage() {
+    uname=$(uname)
+    userid=$(id -u)
+
+    suffix=""
+    case $uname in
+    "Darwin")
+        arch=$(uname -m)
+        case $arch in
+        "x86_64")
+            suffix="darwin_amd64"
+            ;;
+        "arm64")
+            suffix="darwin_arm64"
+            ;;
+        esac
+        ;;
+
+    "MINGW"*)
+        arch=$(uname -m)
+        case $arch in
+        "aarch64")
+            suffix="windows_arm64"
+            ;;
+        "i386")
+            suffix="windows_386"
+            ;;
+        "x86_64")
+            suffix="windows_amd64"
+            ;;
+        esac
+
+        BINLOCATION="$HOME/bin"
+        mkdir -p $BINLOCATION
+
+        ;;
+    "Linux")
+        arch=$(uname -m)
+        case $arch in
+        "aarch64")
+            suffix="linux_arm64"
+            ;;
+        "armv6l" | "armv7l")
+            suffix="linux_armhf"
+            ;;
+        "i386")
+            suffix="linux_386"
+            ;;
+        "x86_64")
+            suffix="linux_amd64"
+            ;;
+        esac
+        ;;
+    esac
+
+    fileName="${REPO}_${version}_$suffix"
+    targetFile="/tmp/$fileName"
+
+    if [ "$userid" != "0" ]; then
+        targetFile="$(pwd)/$fileName"
+    fi
+
+    if [ -e "$targetFile" ]; then
+        rm "$targetFile"
+    fi
+
+    url=https://github.com/$OWNER/$REPO/releases/download/$version/$fileName
+    echo "Downloading package $url as $targetFile"
+
+    curl -sSL $url --output "$targetFile"
+
+    if [ "$?" = "0" ]; then
+
+        if [ "$VERIFY_CHECKSUM" = "1" ]; then
+            checkHash
+        fi
+
+        chmod +x "$targetFile"
+
+        echo "Download complete."
+
+        if [ ! -w "$BINLOCATION" ]; then
+
+            echo
+            echo "============================================================"
+            echo "  The script was run as a user who is unable to write"
+            echo "  to $BINLOCATION. To complete the installation the"
+            echo "  following commands may need to be run manually."
+            echo "============================================================"
+            echo
+            echo "  sudo cp $REPO$suffix $BINLOCATION/$REPO"
+
+            if [ -n "$ALIAS_NAME" ]; then
+                echo "  sudo ln -sf $BINLOCATION/$REPO $BINLOCATION/$ALIAS_NAME"
+            fi
+
+            echo
+
+        else
+
+            echo
+            echo "Running with sufficient permissions to attempt to move $REPO to $BINLOCATION"
+
+            if [ ! -w "$BINLOCATION/$REPO" ] && [ -f "$BINLOCATION/$REPO" ]; then
+
+                echo
+                echo "================================================================"
+                echo "  $BINLOCATION/$REPO already exists and is not writeable"
+                echo "  by the current user.  Please adjust the binary ownership"
+                echo "  or run sh/bash with sudo."
+                echo "================================================================"
+                echo
+                exit 1
+
+            fi
+
+            mv "$targetFile" $BINLOCATION/$REPO
+
+            if [ "$?" = "0" ]; then
+                echo "New version of $REPO installed to $BINLOCATION"
+            fi
+
+            if [ -e "$targetFile" ]; then
+                rm "$targetFile"
+            fi
+
+            if [ -n "$ALIAS_NAME" ]; then
+                if [ $(which $ALIAS_NAME) ]; then
+                    echo "There is already a command '$ALIAS_NAME' in the path, NOT creating alias"
+                else
+                    if [ ! -L $BINLOCATION/$ALIAS_NAME ]; then
+                        ln -s $BINLOCATION/$REPO $BINLOCATION/$ALIAS_NAME
+                        echo "Creating alias '$ALIAS_NAME' for '$REPO'."
+                    fi
+                fi
+            fi
+
+            ${SUCCESS_CMD}
+        fi
+    fi
+}
+
+hasCli
+getPackage
