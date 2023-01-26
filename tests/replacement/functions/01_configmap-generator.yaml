@@ -6,6 +6,7 @@ metadata:
   name: configuration-map
   namespace: argocd
   annotations:
+    config.kaweezle.com/local-config: "true"
     config.kubernetes.io/function: |
       exec:
         path: ../../krmfnbuiltin

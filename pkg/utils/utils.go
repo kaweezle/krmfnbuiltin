@@ -1,9 +1,10 @@
 package utils
 
 import (
+	"strconv"
+
 	"sigs.k8s.io/kustomize/api/resource"
 	"sigs.k8s.io/kustomize/kyaml/kio"
-	"sigs.k8s.io/kustomize/kyaml/kio/filters"
 	"sigs.k8s.io/kustomize/kyaml/kio/kioutil"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 )
@@ -37,28 +38,50 @@ func RemoveBuildAnnotations(r *resource.Resource) {
 	}
 }
 
-func MakeResourceLocal(r *yaml.RNode) error {
-	annotations := r.GetAnnotations()
+func TransferAnnotations(list []*yaml.RNode, config *yaml.RNode) (err error) {
+	path := ".krmfnbuiltin.yaml"
+	startIndex := 0
 
-	annotations[filters.LocalConfigAnnotation] = "true"
-	if _, ok := annotations[kioutil.PathAnnotation]; !ok {
-		annotations[kioutil.PathAnnotation] = ".generated.yaml"
-	}
-	if _, ok := annotations[kioutil.LegacyPathAnnotation]; !ok {
-		annotations[kioutil.LegacyPathAnnotation] = ".generated.yaml"
-	}
-	delete(annotations, FunctionAnnotationInjectLocal)
-	delete(annotations, FunctionAnnotationFunction)
+	configAnnotations := config.GetAnnotations()
+	_, local := configAnnotations[FunctionAnnotationLocalConfig]
 
-	return r.SetAnnotations(annotations)
+	if annoPath, ok := configAnnotations[FunctionAnnotationPath]; ok {
+		path = annoPath
+	}
+
+	if annoIndex, ok := configAnnotations[FunctionAnnotationIndex]; ok {
+		startIndex, err = strconv.Atoi(annoIndex)
+		if err != nil {
+			return
+		}
+	}
+
+	for index, r := range list {
+		annotations := r.GetAnnotations()
+		if local {
+			annotations[FunctionAnnotationLocalConfig] = "true"
+		}
+		annotations[kioutil.LegacyPathAnnotation] = path
+		annotations[kioutil.PathAnnotation] = path
+
+		curIndex := strconv.Itoa(startIndex + index)
+		annotations[kioutil.LegacyIndexAnnotation] = curIndex
+		annotations[kioutil.IndexAnnotation] = curIndex
+		delete(annotations, FunctionAnnotationInjectLocal)
+		delete(annotations, FunctionAnnotationFunction)
+		r.SetAnnotations(annotations)
+	}
+	return
 }
 
 func unLocal(list []*yaml.RNode) ([]*yaml.RNode, error) {
+	output := []*yaml.RNode{}
 	for _, r := range list {
 		annotations := r.GetAnnotations()
-		if _, ok := annotations[FunctionAnnotationKeepLocal]; ok {
-			delete(annotations, FunctionAnnotationKeepLocal)
-			delete(annotations, FunctionAnnotationLocalConfig)
+		// We don't append resources with config.kaweezle.com/local-config resources
+		if _, ok := annotations[FunctionAnnotationLocalConfig]; !ok {
+			// For the remaining resources, if a path and/or index was specified
+			// we copy it.
 			if path, ok := annotations[FunctionAnnotationPath]; ok {
 				annotations[kioutil.LegacyPathAnnotation] = path
 				annotations[kioutil.PathAnnotation] = path
@@ -70,9 +93,10 @@ func unLocal(list []*yaml.RNode) ([]*yaml.RNode, error) {
 				delete(annotations, FunctionAnnotationIndex)
 			}
 			r.SetAnnotations(annotations)
+			output = append(output, r)
 		}
 	}
-	return list, nil
+	return output, nil
 }
 
 var UnLocal kio.FilterFunc = unLocal

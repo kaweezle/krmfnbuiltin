@@ -23,7 +23,7 @@ const (
 	FunctionAnnotationFunction = ConfigurationAnnotationDomain + "/function"
 
 	// true when the resource is part of the local configuration
-	FunctionAnnotationLocalConfig = ConfigurationAnnotationDomain + "/local-config"
+	FunctionAnnotationLocalConfig = LocalConfigurationAnnotationDomain + "/local-config"
 
 	// Setting to true means we want this function configuration to be injected as a
 	// local configuration resource (local-config)
@@ -31,8 +31,8 @@ const (
 
 	// if set, the transformation will remove all the resources marked as local-config
 	FunctionAnnotationPruneLocal = LocalConfigurationAnnotationDomain + "/prune-local"
-	// if set on a Generated resource, it won't be pruned
-	FunctionAnnotationKeepLocal = LocalConfigurationAnnotationDomain + "/keep-local"
-	FunctionAnnotationPath      = LocalConfigurationAnnotationDomain + "/path"
-	FunctionAnnotationIndex     = LocalConfigurationAnnotationDomain + "/index"
+	// Saving path for injected resource
+	FunctionAnnotationPath = LocalConfigurationAnnotationDomain + "/path"
+	// Saving index for injected resource
+	FunctionAnnotationIndex = LocalConfigurationAnnotationDomain + "/index"
 )
