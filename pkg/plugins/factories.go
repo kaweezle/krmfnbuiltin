@@ -39,6 +39,7 @@ const (
 	ReplacementTransformer
 	GitConfigMapGenerator
 	RemoveTransformer
+	KustomizationGenerator
 )
 
 var stringToBuiltinPluginTypeMap map[string]BuiltinPluginType
@@ -122,6 +123,7 @@ var GeneratorFactories = map[BuiltinPluginType]func() resmap.GeneratorPlugin{
 	SecretGenerator:             builtins.NewSecretGeneratorPlugin,
 	HelmChartInflationGenerator: builtins.NewHelmChartInflationGeneratorPlugin,
 	GitConfigMapGenerator:       extras.NewGitConfigMapGeneratorPlugin,
+	KustomizationGenerator:      extras.NewKustomizationGeneratorPlugin,
 }
 
 func MakeBuiltinPlugin(r resid.Gvk) (resmap.Configurable, error) {

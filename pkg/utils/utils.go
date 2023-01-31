@@ -61,12 +61,14 @@ func TransferAnnotations(list []*yaml.RNode, config *yaml.RNode) (err error) {
 		if local {
 			annotations[FunctionAnnotationLocalConfig] = "true"
 		}
-		annotations[kioutil.LegacyPathAnnotation] = path
-		annotations[kioutil.PathAnnotation] = path
+		if path != "" {
+			annotations[kioutil.LegacyPathAnnotation] = path
+			annotations[kioutil.PathAnnotation] = path
 
-		curIndex := strconv.Itoa(startIndex + index)
-		annotations[kioutil.LegacyIndexAnnotation] = curIndex
-		annotations[kioutil.IndexAnnotation] = curIndex
+			curIndex := strconv.Itoa(startIndex + index)
+			annotations[kioutil.LegacyIndexAnnotation] = curIndex
+			annotations[kioutil.IndexAnnotation] = curIndex
+		}
 		delete(annotations, FunctionAnnotationInjectLocal)
 		delete(annotations, FunctionAnnotationFunction)
 		r.SetAnnotations(annotations)

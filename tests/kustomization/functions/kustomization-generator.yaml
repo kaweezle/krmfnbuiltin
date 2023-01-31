@@ -1,0 +1,10 @@
+apiVersion: builtin
+kind: KustomizationGenerator
+metadata:
+  name: kustomization-generator
+  annotations:
+    config.kaweezle.com/path: ""
+    config.kubernetes.io/function: |
+      exec:
+        path: ../../krmfnbuiltin
+kustomizeDirectory: https://github.com/antoinemartin/autocloud.git//packages/uninode?ref=deploy/citest

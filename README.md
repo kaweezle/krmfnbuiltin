@@ -23,6 +23,7 @@ transformation in your kustomize projects.
             <li><a href="#configmap-generator-with-git-properties">ConfigMap generator with git properties</a></li>
             <li><a href="#heredoc-generator">Heredoc generator</a></li>
             <li><a href="#extended-replacement-in-structured-content">Extended replacement in structured content</a></li>
+            <li><a href="#kustomization-generator">Kustomization generator</a></li>
         </ul>
     </li>
     <li><a href="#installation">Installation</a></li>
@@ -350,6 +351,24 @@ metadata:
 
 With these annotations, the generated config map will be saved in the
 `local-config.yaml` file in the configuration directory.
+
+If the file name is empty, i.e. the annotation is:
+
+```yaml
+config.kaweezle.com/path: ""
+```
+
+The generated resources will be saved each in its own file with the pattern:
+
+```text
+<namespace>/<kind>_<name>.yaml
+```
+
+For instance:
+
+```text
+kube-flannel/daemonset_kube-flannel-ds.yaml
+```
 
 ## Extensions
 
@@ -735,7 +754,7 @@ metadata:
     config.kaweezle.com/local-config: "true"
     config.kubernetes.io/function: |
       exec:
-        path: ../../krmfnbuiltin
+        path: krmfnbuiltin
 data:
   sish:
     # New properties
@@ -751,7 +770,7 @@ metadata:
     config.kaweezle.com/prune-local: "true"
     config.kubernetes.io/function: |
       exec:
-        path: ../../krmfnbuiltin
+        path: krmfnbuiltin
 replacements:
   - source:
       kind: LocalConfiguration
@@ -809,6 +828,47 @@ will become
 ```sshconfig
       HostName target.link
 ```
+
+### Kustomization generator
+
+`KustomizationGenerator` is the kustomize equivalent to
+`HelmChartInflationGenerator`. It allows generating resources from a
+kustomization.
+
+Example:
+
+```yaml
+apiVersion: builtin
+kind: KustomizationGenerator
+metadata:
+  name: kustomization-generator
+  annotations:
+    config.kaweezle.com/path: "uninode.yaml"
+    config.kubernetes.io/function: |
+      exec:
+        path: krmfnbuiltin
+kustomizeDirectory: https://github.com/antoinemartin/autocloud.git//packages/uninode?ref=deploy/citest
+```
+
+If this function is run with the following command:
+
+```console
+> kustomize fn run --enable-exec --fn-path functions applications
+```
+
+It will generate a file named `uninode.yaml` in the `applications` directory.
+With:
+
+```yaml
+config.kaweezle.com/path: ""
+```
+
+One file will be created per resource (see
+[Keeping or deleting generated resources](#keeping-or-deleting-generated-resources)).
+
+**IMPORTANT** `krmfnbuiltin` runs from the directory where the
+`kustomize run fn` command has been launched, and **not from the function
+configuration folder**. Any relative path should take this into consideration.
 
 ## Installation
 

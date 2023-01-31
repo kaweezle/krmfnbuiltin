@@ -38,6 +38,7 @@ jobs:
           args: --snapshot --skip-publish --rm-dist
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SCOOP_BUCKET_GITHUB_TOKEN: ${{ secrets.REPO_ACCESS_TOKEN }}
       # - name: Build APK repo
       #   uses: ./.github/actions/make-apkindex
       #   with:
