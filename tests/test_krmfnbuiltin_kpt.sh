@@ -23,10 +23,14 @@ for d in $(ls -d */); do
         mv $temp_file_2 $temp_file
     done
     cat $temp_file | kpt fn sink applications
-    for f in $(ls -1 expected); do
-        echo "  > Checking $f..."
-        diff <(yq eval -P expected/$f) <(yq eval -P applications/$f)
-    done
+    if [ -d expected ]; then
+        for f in $(ls -1 applications); do
+            echo "  > Checking $f..."
+            diff <(yq eval -P expected/$f) <(yq eval -P applications/$f)
+        done
+    else
+        echo "  > No expected result. Skipping check"
+    fi
     cd ..
 done
 echo "Done ok 🎉"
