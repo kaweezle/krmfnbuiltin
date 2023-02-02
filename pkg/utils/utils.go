@@ -62,10 +62,12 @@ func TransferAnnotations(list []*yaml.RNode, config *yaml.RNode) (err error) {
 			annotations[FunctionAnnotationLocalConfig] = "true"
 		}
 		if path != "" {
+			//lint:ignore SA1019 used by kustomize
 			annotations[kioutil.LegacyPathAnnotation] = path
 			annotations[kioutil.PathAnnotation] = path
 
 			curIndex := strconv.Itoa(startIndex + index)
+			//lint:ignore SA1019 used by kustomize
 			annotations[kioutil.LegacyIndexAnnotation] = curIndex
 			annotations[kioutil.IndexAnnotation] = curIndex
 		}
@@ -85,11 +87,13 @@ func unLocal(list []*yaml.RNode) ([]*yaml.RNode, error) {
 			// For the remaining resources, if a path and/or index was specified
 			// we copy it.
 			if path, ok := annotations[FunctionAnnotationPath]; ok {
+				//lint:ignore SA1019 used by kustomize
 				annotations[kioutil.LegacyPathAnnotation] = path
 				annotations[kioutil.PathAnnotation] = path
 				delete(annotations, FunctionAnnotationPath)
 			}
 			if index, ok := annotations[FunctionAnnotationIndex]; ok {
+				//lint:ignore SA1019 used by kustomize
 				annotations[kioutil.LegacyIndexAnnotation] = index
 				annotations[kioutil.IndexAnnotation] = index
 				delete(annotations, FunctionAnnotationIndex)

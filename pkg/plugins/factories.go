@@ -155,5 +155,8 @@ func NewPluginHelpers() (*resmap.PluginHelpers, error) {
 		return nil, err
 	}
 
-	return resmap.NewPluginHelpers(ldr, depProvider.GetFieldValidator(), resmapFactory, types.DisabledPluginConfig()), nil
+	config := types.DisabledPluginConfig()
+	config.HelmConfig.Enabled = true
+	config.HelmConfig.Command = "helm"
+	return resmap.NewPluginHelpers(ldr, depProvider.GetFieldValidator(), resmapFactory, config), nil
 }
