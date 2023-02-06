@@ -27,43 +27,36 @@ func main() {
 		plugin, err := plugins.MakeBuiltinPlugin(resid.GvkFromNode(config))
 		if err != nil {
 			// Check if config asks us to inject it
-			if _, ok := config.GetAnnotations()[utils.FunctionAnnotationInjectLocal]; ok {
-				injected := config.Copy()
-
-				err := utils.TransferAnnotations([]*yaml.RNode{injected}, config)
-				if err != nil {
-					return errors.WrapPrefixf(
-						err, "Error while mangling annotations on %s fails configuration", res.OrgId())
-				}
-				rl.Items = append(rl.Items, injected)
-				return nil
-			} else {
+			if _, ok := config.GetAnnotations()[utils.FunctionAnnotationInjectLocal]; !ok {
 				return errors.WrapPrefixf(err, "creating plugin")
 			}
 		}
 
-		yamlNode := config.YNode()
-		yamlBytes, err := yaml.Marshal(yamlNode)
+		ok := false
+		var transformer resmap.Transformer
 
-		if err != nil {
-			return errors.WrapPrefixf(err, "marshalling yaml from res %s", res.OrgId())
-		}
-		helpers, err := plugins.NewPluginHelpers()
-		if err != nil {
-			return errors.WrapPrefixf(err, "Cannot build Plugin helpers")
-		}
-		err = plugin.Config(helpers, yamlBytes)
-		if err != nil {
-			return errors.WrapPrefixf(
-				err, "plugin %s fails configuration", res.OrgId())
-		}
+		if plugin != nil {
+			yamlNode := config.YNode()
+			yamlBytes, err := yaml.Marshal(yamlNode)
 
-		transformer, ok := plugin.(resmap.Transformer)
-		if ok {
-			rm, err := helpers.ResmapFactory().NewResMapFromRNodeSlice(rl.Items)
 			if err != nil {
-				return errors.WrapPrefixf(err, "getting resource maps")
+				return errors.WrapPrefixf(err, "marshalling yaml from res %s", res.OrgId())
 			}
+			helpers, err := plugins.NewPluginHelpers()
+			if err != nil {
+				return errors.WrapPrefixf(err, "Cannot build Plugin helpers")
+			}
+			err = plugin.Config(helpers, yamlBytes)
+			if err != nil {
+				return errors.WrapPrefixf(
+					err, "plugin %s fails configuration", res.OrgId())
+			}
+
+			transformer, ok = plugin.(resmap.Transformer)
+		}
+
+		if ok {
+			rm := utils.ResourceMapFromNodes(rl.Items)
 			err = transformer.Transform(rm)
 			if err != nil {
 				return errors.WrapPrefixf(err, "Transforming resources")
@@ -85,18 +78,24 @@ func main() {
 			}
 
 		} else {
-			generator, ok := plugin.(resmap.Generator)
+			var rrl []*yaml.RNode
+			if plugin == nil { // No plugin, it's an heredoc document
+				rrl = []*yaml.RNode{config.Copy()}
+			} else {
+				generator, ok := plugin.(resmap.Generator)
 
-			if !ok {
-				return fmt.Errorf("plugin %s is neither a generator nor a transformer", res.OrgId())
+				if !ok {
+					return fmt.Errorf("plugin %s is neither a generator nor a transformer", res.OrgId())
+				}
+
+				rm, err := generator.Generate()
+				if err != nil {
+					return errors.WrapPrefixf(err, "generating resource(s)")
+				}
+
+				rrl = rm.ToRNodeSlice()
 			}
 
-			rm, err := generator.Generate()
-			if err != nil {
-				return errors.WrapPrefixf(err, "generating resource(s)")
-			}
-
-			rrl := rm.ToRNodeSlice()
 			if err := utils.TransferAnnotations(rrl, config); err != nil {
 				return errors.WrapPrefixf(err, "While transferring annotations")
 			}

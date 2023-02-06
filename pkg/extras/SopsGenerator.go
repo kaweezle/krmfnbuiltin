@@ -11,7 +11,6 @@ import (
 	"go.mozilla.org/sops/v3/keyservice"
 	"sigs.k8s.io/kustomize/api/resmap"
 	"sigs.k8s.io/kustomize/kyaml/kio"
-	kiof "sigs.k8s.io/kustomize/kyaml/kio/filters"
 	yaml "sigs.k8s.io/kustomize/kyaml/yaml"
 	oyaml "sigs.k8s.io/yaml"
 )
@@ -100,24 +99,12 @@ func (p *SopsGeneratorPlugin) Generate() (resmap.ResMap, error) {
 		if err != nil {
 			return nil, errors.Wrapf(err, "error decoding manifest %q, content -->%s<--", name, string(p.buffer))
 		}
-		kind := defaultKind
-		apiVersion := defaultApiVersion
-		if p.Annotations != nil {
-			if annoKind, ok := p.Annotations[utils.FunctionAnnotationKind]; ok {
-				kind = annoKind
-			}
-			if annoApiVersion, ok := p.Annotations[utils.FunctionAnnotationApiVersion]; ok {
-				apiVersion = annoApiVersion
-			}
-		}
 
 		for _, r := range nodes {
-			r.SetKind(kind)
-			r.SetApiVersion(apiVersion)
-			if err := r.PipeE(yaml.ClearAnnotation(utils.FunctionAnnotationFunction)); err != nil {
-				return nil, err
-			}
-			if err := r.PipeE(yaml.ClearAnnotation(kiof.LocalConfigAnnotation)); err != nil {
+			r.SetKind(defaultKind)
+			r.SetApiVersion(defaultApiVersion)
+
+			if err := r.PipeE(yaml.SetAnnotation(utils.FunctionAnnotationInjectLocal, "true")); err != nil {
 				return nil, err
 			}
 		}
@@ -140,7 +127,7 @@ func (p *SopsGeneratorPlugin) Generate() (resmap.ResMap, error) {
 		}
 
 	}
-	return p.h.ResmapFactory().NewResMapFromRNodeSlice(nodes)
+	return utils.ResourceMapFromNodes(nodes), nil
 }
 
 // NewSopsGeneratorPlugin returns a newly Created SopsGenerator

@@ -3,8 +3,10 @@ package utils
 import (
 	"strconv"
 
+	"sigs.k8s.io/kustomize/api/resmap"
 	"sigs.k8s.io/kustomize/api/resource"
 	"sigs.k8s.io/kustomize/kyaml/kio"
+	"sigs.k8s.io/kustomize/kyaml/kio/filters"
 	"sigs.k8s.io/kustomize/kyaml/kio/kioutil"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 )
@@ -71,10 +73,24 @@ func TransferAnnotations(list []*yaml.RNode, config *yaml.RNode) (err error) {
 			annotations[kioutil.LegacyIndexAnnotation] = curIndex
 			annotations[kioutil.IndexAnnotation] = curIndex
 		}
+
+		if _, ok := annotations[FunctionAnnotationInjectLocal]; ok {
+			// It's an heredoc document
+			if kind, ok := configAnnotations[FunctionAnnotationKind]; ok {
+				r.SetKind(kind)
+			}
+			if apiVersion, ok := configAnnotations[FunctionAnnotationApiVersion]; ok {
+				r.SetApiVersion(apiVersion)
+			}
+		}
+
 		delete(annotations, FunctionAnnotationInjectLocal)
 		delete(annotations, FunctionAnnotationFunction)
 		delete(annotations, FunctionAnnotationPath)
 		delete(annotations, FunctionAnnotationIndex)
+		delete(annotations, FunctionAnnotationKind)
+		delete(annotations, FunctionAnnotationApiVersion)
+		delete(annotations, filters.LocalConfigAnnotation)
 		r.SetAnnotations(annotations)
 	}
 	return
@@ -108,3 +124,11 @@ func unLocal(list []*yaml.RNode) ([]*yaml.RNode, error) {
 }
 
 var UnLocal kio.FilterFunc = unLocal
+
+func ResourceMapFromNodes(nodes []*yaml.RNode) resmap.ResMap {
+	result := resmap.New()
+	for _, n := range nodes {
+		result.Append(&resource.Resource{RNode: *n})
+	}
+	return result
+}
