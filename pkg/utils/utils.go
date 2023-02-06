@@ -73,6 +73,8 @@ func TransferAnnotations(list []*yaml.RNode, config *yaml.RNode) (err error) {
 		}
 		delete(annotations, FunctionAnnotationInjectLocal)
 		delete(annotations, FunctionAnnotationFunction)
+		delete(annotations, FunctionAnnotationPath)
+		delete(annotations, FunctionAnnotationIndex)
 		r.SetAnnotations(annotations)
 	}
 	return
