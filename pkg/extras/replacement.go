@@ -4,15 +4,17 @@
 package extras
 
 import (
-	"errors"
 	"fmt"
 	"reflect"
 	"strings"
 
 	"github.com/kaweezle/krmfnbuiltin/pkg/utils"
+	"github.com/pkg/errors"
+	"sigs.k8s.io/kustomize/api/loader"
 	"sigs.k8s.io/kustomize/api/resmap"
 	"sigs.k8s.io/kustomize/api/resource"
 	"sigs.k8s.io/kustomize/api/types"
+	"sigs.k8s.io/kustomize/kyaml/filesys"
 	"sigs.k8s.io/kustomize/kyaml/resid"
 	kyaml_utils "sigs.k8s.io/kustomize/kyaml/utils"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
@@ -20,15 +22,20 @@ import (
 
 type extendedFilter struct {
 	Replacements []types.Replacement `json:"replacements,omitempty" yaml:"replacements,omitempty"`
+	sourceNodes  []*yaml.RNode
 }
 
 // Filter replaces values of targets with values from sources
 func (f extendedFilter) Filter(nodes []*yaml.RNode) ([]*yaml.RNode, error) {
+	sourceNodes := f.sourceNodes
+	if sourceNodes == nil {
+		sourceNodes = nodes
+	}
 	for i, r := range f.Replacements {
 		if r.Source == nil || r.Targets == nil {
 			return nil, fmt.Errorf("replacements must specify a source and at least one target")
 		}
-		value, err := getReplacement(nodes, &f.Replacements[i])
+		value, err := getReplacement(sourceNodes, &f.Replacements[i])
 		if err != nil {
 			return nil, err
 		}
@@ -347,6 +354,8 @@ func prevIds(n *yaml.RNode) ([]resid.ResId, error) {
 type ExtendedReplacementTransformerPlugin struct {
 	ReplacementList []types.ReplacementField `json:"replacements,omitempty" yaml:"replacements,omitempty"`
 	Replacements    []types.Replacement      `json:"omitempty" yaml:"omitempty"`
+	Source          string                   `json:"source,omitempty" yaml:"source,omitempty"`
+	h               *resmap.PluginHelpers
 }
 
 // Config configures the plugin
@@ -356,6 +365,7 @@ func (p *ExtendedReplacementTransformerPlugin) Config(
 	if err := yaml.Unmarshal(c, p); err != nil {
 		return err
 	}
+	p.h = h
 
 	for _, r := range p.ReplacementList {
 		if r.Path != "" && (r.Source != nil || len(r.Targets) != 0) {
@@ -395,13 +405,33 @@ func (p *ExtendedReplacementTransformerPlugin) Config(
 			p.Replacements = append(p.Replacements, r.Replacement)
 		}
 	}
+
 	return nil
 }
 
 // Transform performs the configured replacements in the specified resource map
 func (p *ExtendedReplacementTransformerPlugin) Transform(m resmap.ResMap) (err error) {
+
+	var sourceNodes []*yaml.RNode
+	if p.Source != "" {
+		source, err := p.h.ResmapFactory().FromFile(p.h.Loader(), p.Source)
+		if err != nil {
+			if errors.Is(err, loader.ErrHTTP) {
+				return errors.Wrapf(err, "while reading source %s", p.Source)
+			}
+
+			source, err = runKustomizations(filesys.MakeFsOnDisk(), p.Source)
+			if err != nil {
+				return errors.Wrapf(err, "while getting source for replacements %s", p.Source)
+			}
+		}
+
+		sourceNodes = source.ToRNodeSlice()
+	}
+
 	return m.ApplyFilter(extendedFilter{
 		Replacements: p.Replacements,
+		sourceNodes:  sourceNodes,
 	})
 }
 

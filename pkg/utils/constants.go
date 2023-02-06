@@ -35,4 +35,10 @@ const (
 	FunctionAnnotationPath = LocalConfigurationAnnotationDomain + "/path"
 	// Saving index for injected resource
 	FunctionAnnotationIndex = LocalConfigurationAnnotationDomain + "/index"
+
+	// Annotation for setting kind of in place generated resources
+	FunctionAnnotationKind = LocalConfigurationAnnotationDomain + "/kind"
+
+	// Annotation for setting api version of in place generated resources
+	FunctionAnnotationApiVersion = LocalConfigurationAnnotationDomain + "/apiVersion"
 )

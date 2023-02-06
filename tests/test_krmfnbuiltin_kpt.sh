@@ -12,6 +12,15 @@ temp_file_2=$(mktemp)
 
 trap "find . -type d -name 'applications' -exec rm -rf {} +; rm -f $temp_file $temp_file_2" EXIT
 
+export SOPS_AGE_KEY=$(cat - <<EOF
+# created: 2023-01-19T19:41:45Z
+# public key: age166k86d56ejs2ydvaxv2x3vl3wajny6l52dlkncf2k58vztnlecjs0g5jqq
+AGE-SECRET-KEY-15RKTPQCCLWM7EHQ8JEP0TQLUWJAECVP7332M3ZP0RL9R7JT7MZ6SY79V8Q
+EOF
+)
+export SOPS_RECICPIENT="age166k86d56ejs2ydvaxv2x3vl3wajny6l52dlkncf2k58vztnlecjs0g5jqq"
+
+
 for d in $(ls -d */); do
     echo "Running Test in $d..."
     cd $d

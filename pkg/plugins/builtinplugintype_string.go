@@ -30,11 +30,12 @@ func _() {
 	_ = x[GitConfigMapGenerator-19]
 	_ = x[RemoveTransformer-20]
 	_ = x[KustomizationGenerator-21]
+	_ = x[SopsGenerator-22]
 }
 
-const _BuiltinPluginType_name = "UnknownAnnotationsTransformerConfigMapGeneratorIAMPolicyGeneratorHashTransformerImageTagTransformerLabelTransformerNamespaceTransformerPatchJson6902TransformerPatchStrategicMergeTransformerPatchTransformerPrefixSuffixTransformerPrefixTransformerSuffixTransformerReplicaCountTransformerSecretGeneratorValueAddTransformerHelmChartInflationGeneratorReplacementTransformerGitConfigMapGeneratorRemoveTransformerKustomizationGenerator"
+const _BuiltinPluginType_name = "UnknownAnnotationsTransformerConfigMapGeneratorIAMPolicyGeneratorHashTransformerImageTagTransformerLabelTransformerNamespaceTransformerPatchJson6902TransformerPatchStrategicMergeTransformerPatchTransformerPrefixSuffixTransformerPrefixTransformerSuffixTransformerReplicaCountTransformerSecretGeneratorValueAddTransformerHelmChartInflationGeneratorReplacementTransformerGitConfigMapGeneratorRemoveTransformerKustomizationGeneratorSopsGenerator"
 
-var _BuiltinPluginType_index = [...]uint16{0, 7, 29, 47, 65, 80, 99, 115, 135, 159, 189, 205, 228, 245, 262, 285, 300, 319, 346, 368, 389, 406, 428}
+var _BuiltinPluginType_index = [...]uint16{0, 7, 29, 47, 65, 80, 99, 115, 135, 159, 189, 205, 228, 245, 262, 285, 300, 319, 346, 368, 389, 406, 428, 441}
 
 func (i BuiltinPluginType) String() string {
 	if i < 0 || i >= BuiltinPluginType(len(_BuiltinPluginType_index)-1) {

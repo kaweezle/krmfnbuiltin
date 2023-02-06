@@ -1,0 +1,11 @@
+apiVersion: autocloud.config.kaweezle.com/v1alpha1
+kind: PlatformValues
+metadata:
+  name: autocloud-values
+data:
+  github:
+    organization: thisisfakeorganization
+    repository: autocloud
+    repo: antoinemartin/autocloud
+    email: john@doe.me
+    clientID: thisisfakeclientid

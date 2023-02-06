@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cm
+data:
+  configManagementPlugins: |
+    - name: helmfile
+      generate:
+        command: ["/bin/sh", "-c"]
+        args: ["helmfile --namespace $ARGOCD_APP_NAMESPACE template | sed -e '1,/---/d' | sed -e 's|apiregistration.k8s.io/v1beta1|apiregistration.k8s.io/v1|g'"]
+  timeout.reconciliation: "15s"
+  kustomize.buildOptions: "--enable-alpha-plugins --enable-exec"
+  helm.valuesFileSchemes: "secrets+gpg-import, secrets+gpg-import-kubernetes, secrets+age-import, secrets+age-import-kubernetes, secrets, https,http"
+  # resource.exclusions: |
+  #   - apiGroups:
+  #       - "cert-manager.io"
+  #       - "acme.cert-manager.io"
+  #     kinds:
+  #       - "CertificateRequest"
+  #       - "Order"
+  #     clusters:
+  #       - https://kubernetes.default.svc
+  url: https://citest.holepunch.in
+  dex.config: |
+    connectors:
+      # GitHub example
+      - type: github
+        id: github
+        name: GitHub
+        config:
+          clientID: a98a3e6e82b3732c1bf2
+          clientSecret: $dex.github.clientSecret
+          loadAllGroups: true
+          teamNameField: slug
+          orgs:
+            - name: johndoe

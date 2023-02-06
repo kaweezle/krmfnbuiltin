@@ -22,8 +22,11 @@ transformation in your kustomize projects.
             <li><a href="#remove-transformer">Remove Transformer</a></li>
             <li><a href="#configmap-generator-with-git-properties">ConfigMap generator with git properties</a></li>
             <li><a href="#heredoc-generator">Heredoc generator</a></li>
-            <li><a href="#extended-replacement-in-structured-content">Extended replacement in structured content</a></li>
             <li><a href="#kustomization-generator">Kustomization generator</a></li>
+            <li><a href="#sops-decryption-generator">Sops decryption generator</a></li>
+            <li><a href="#extended-replacement-in-structured-content">Extended replacement in structured content</a>
+                <ul><li><a href="#replacements-source-reuse">Replacements source reuse</a></li></ul>
+            </li>
         </ul>
     </li>
     <li><a href="#installation">Installation</a></li>
@@ -135,7 +138,7 @@ metadata:
         path: krmfnbuiltin
     # Can also be:
     #  container:
-    #    image: ghcr.io/kaweezle/krmfnbuiltin:v0.3.0
+    #    image: ghcr.io/kaweezle/krmfnbuiltin:v0.4.0
 patch: |-
   - op: replace
       path: /spec/source/repoURL
@@ -317,7 +320,7 @@ on the generators and:
 config.kaweezle.com/prune-local: "true"
 ```
 
-On the last transformation will remove those resources. If the absence of these
+On the last transformation will remove those resources. In the absence of these
 annotations, the generated resources will be saved in a file named
 `.krmfnbuiltin.yaml` located in the configuration directory. You may want to add
 this file name to your `.gitignore` file in order to avoid committing it.
@@ -371,6 +374,10 @@ kube-flannel/daemonset_kube-flannel-ds.yaml
 ```
 
 ## Extensions
+
+This section describes the krmfnbuiltin additions to the Kustomize transformers
+and generators as well as the _enhancements_ that have been made to some of
+them.
 
 ### Remove Transformer
 
@@ -449,17 +456,22 @@ data:
 
 ### Heredoc generator
 
-Using `ConfigMapGenerator` to _inject_ values in the transformation is fine but
-has some limitations, due to its _flat nature_. It cannot be used for _object_
-replacement and it's difficult to organize replacement variables. For object
-replacement, you can use `PatchStrategicMergeTransformer` but then you loose the
-`ReplacementTransformer` advantage of using the same source for several targets.
+We have seen in [Use of generators](#use-of-generators) how to use
+`ConfigMapGenerator` to _inject_ values in order to use them in downstream
+transformers, replacements in particular. It has however some limitations, due
+to the _flat nature_ of ConfigMaps and the fact that values are only strings.
+The former makes it difficult to organize replacement variables and the later
+prevents structural (_object_) replacement. For object replacements we can use
+`PatchStrategicMergeTransformer`, but then we loose the `ReplacementTransformer`
+advantage of using the same source for several targets and end up having
+duplicate YAML snippets.
 
-`krmfnbuiltin` allows injecting any KRM resource in the transformation. Just add
-the `config.kaweezle.com/inject-local: "true"` annotation. For instance:
+`krmfnbuiltin` allows injecting any KRM resource in the transformation by just
+adding the `config.kaweezle.com/inject-local: "true"` annotation to the function
+configuration. For instance:
 
 ```yaml
-apiVersion: builtin
+apiVersion: config.kaweezle.com/v1alpha1
 kind: LocalConfiguration
 metadata:
   name: traefik-customization
@@ -467,6 +479,8 @@ metadata:
     # This will inject this resource. like a ConfigMapGenerator, but with hierarchical
     # properties
     config.kaweezle.com/inject-local: "true"
+    # This annotation will allow pruning at the end
+    config.kaweezle.com/local-config: "true"
     config.kubernetes.io/function: |
       exec:
         path: krmfnbuiltin
@@ -485,14 +499,191 @@ data:
 When the function configuration contains the `config.kaweezle.com/inject-local`,
 annotation, `krmfnbuiltin` bypasses the generation/transformation process for
 this function and return the content of the function config _as if_ it had been
-generated. Its content can then be used in the following transformations, in
-particular in replacements, and be deleted by the last transformation (with the
-help of the `config.kaweezle.com/prune-local` annotation).
+generated. The `config.kaweezle.com/inject-local` annotation as well as the
+`config.kubernetes.io/function` annotation are removed from the injected
+resource.
 
-This injection mechanism, along with the `config.kaweezle.com/keep-local`
-annotation (see
+The resource contents can then be used in the following transformations, in
+particular in replacements, and deleted at the end (with
+`config.kaweezle.com/local-config` and `config.kaweezle.com/prune-local`) or
+even saved (with `config.kaweezle.com/path`). See
 [Keeping or deleting generated resources](#keeping-or-deleting-generated-resources))
-allows adding new resources to an existing configuration.
+for more details.
+
+### Kustomization generator
+
+`KustomizationGenerator` is the kustomize equivalent to
+`HelmChartInflationGenerator`. It allows generating resources from a
+kustomization.
+
+Example:
+
+```yaml
+apiVersion: builtin
+kind: KustomizationGenerator
+metadata:
+  name: kustomization-generator
+  annotations:
+    config.kaweezle.com/path: "uninode.yaml" # file name to save resources
+    config.kubernetes.io/function: |
+      exec:
+        path: krmfnbuiltin
+kustomizeDirectory: https://github.com/antoinemartin/autocloud.git//packages/uninode?ref=deploy/citest
+```
+
+If this function is run with the following command:
+
+```console
+> kustomize fn run --enable-exec --fn-path functions applications
+```
+
+It will generate a file named `uninode.yaml` containing all the resources of the
+built kustomization in the `applications` directory. With:
+
+```yaml
+config.kaweezle.com/path: ""
+```
+
+One file will be created per resource (see
+[Keeping or deleting generated resources](#keeping-or-deleting-generated-resources)).
+
+**IMPORTANT** The current directory `krmfnbuiltin` runs from is the directory in
+which the `kustomize run fn` command has been launched, and **not from the
+function configuration folder**. Any relative path should take this into
+consideration.
+
+### Sops decryption generator
+
+The `SopsGenerator` generates resources from encrypted content. This content can
+be the actual function configuration, in [heredoc](#heredoc-generator) style, or
+can come from other files.
+
+It is an inclusion of [krmfnsops](https://github.com/kaweezle/krmfnsops). See
+its README file for more information.
+
+In the simplest use case, Imagine you have an unencrypted secret that looks like
+this :
+
+```yaml
+# argocd-secret.yaml
+apiVersion: v1
+kind: Secret
+type: Opaque
+metadata:
+  name: argocd-secret
+stringData:
+  admin.password: $2a$10$xdlX460lf/WbJNZU5bBoROj6U7oKgPbEcBrnXaemA6gsCzrAJtQ3y
+  admin.passwordMtime: "2022-08-30T11:26:42Z"
+  webhook.github.secret: ZxqGggxGD070l3dx
+  dex.github.clientSecret: 7lqt6nasit6kjtvptmy2dzy1dr796orn5xh05ru1
+```
+
+If you encrypt it with [sops], you get something like this:
+
+```yaml
+# argocd-secret.yaml
+apiVersion: v1
+kind: Secret
+type: Opaque
+metadata:
+  name: argocd-secret
+stringData:
+  admin.password: ENC[AES256_GCM,data:...,type:str]
+  admin.passwordMtime: ENC[AES256_GCM,data:...,type:str]
+  webhook.github.secret: ENC[AES256_GCM,data:...,type:str]
+  dex.github.clientSecret: ENC[AES256_GCM,data:...==,type:str]
+sops:
+  age:
+    - recipient: age166k86d56...
+      enc: |
+        -----BEGIN AGE ENCRYPTED FILE-----
+        ...
+        -----END AGE ENCRYPTED FILE-----
+  lastmodified: "2023-02-06T11:36:44Z"
+  mac: ENC[AES256_GCM,data:...,type:str]
+  pgp: []
+  encrypted_regex: ^(data|stringData|.*_keys?|admin|adminKey|password)$
+  version: 3.7.3
+```
+
+If you want this resource to be unencrypted at kustomization build, you can
+create the following generator configuration:
+
+```yaml
+# argocd-secret-generator.yaml
+apiVersion: krmfnbuiltin.kaweezle.com/v1alpha1
+kind: SopsGenerator
+metadata:
+  name: argocd-secret-generator
+  annotations:
+    config.kubernetes.io/function: |
+      exec:
+        path: krmfnbuiltin
+files:
+  - argocd-secret.yaml
+```
+
+And insert it in the `generators:` section of your `kustomization.yaml` file:
+
+```yaml
+generators:
+  - argocd-secret-generator.yaml
+```
+
+To avoid adding a generator configuration file to your kustomization, you can
+directly transform the encrypted secret file into a KRM generator:
+
+```yaml
+# argocd-secret.yaml
+apiVersion: krmfnbuiltin.kaweezle.com/v1alpha1
+kind: SopsGenerator
+type: Opaque
+metadata:
+  name: argocd-secret
+  annotations:
+    config.kaweezle.com/kind: "Secret"
+    config.kaweezle.com/apiVersion: "v1"
+    config.kubernetes.io/function: |
+      exec:
+        path: krmfnbuiltin
+stringData:
+  admin.password: ENC[AES256_GCM,data:...,type:str]
+  admin.passwordMtime: ENC[AES256_GCM,data:...,type:str]
+  webhook.github.secret: ENC[AES256_GCM,data:...,type:str]
+  dex.github.clientSecret: ENC[AES256_GCM,data:...==,type:str]
+sops:
+  age:
+    - recipient: age166k86d56...
+      enc: |
+        -----BEGIN AGE ENCRYPTED FILE-----
+        ...
+        -----END AGE ENCRYPTED FILE-----
+  lastmodified: "2023-02-06T11:36:44Z"
+  mac: ENC[AES256_GCM,data:...,type:str]
+  pgp: []
+  encrypted_regex: ^(data|stringData|.*_keys?|admin|adminKey|password)$
+  version: 3.7.3
+```
+
+And your `kustomization.yaml` file would look like:
+
+```yaml
+generators:
+  - argocd-secret.yaml
+```
+
+Note the use of the following annotations:
+
+```yaml
+config.kaweezle.com/kind: "Secret"
+config.kaweezle.com/apiVersion: "v1"
+```
+
+In order to have the generated resource with the proper kind and api version.
+
+**WARNING** While this second inclusion method reduces the number of files, it
+disables the [sops] Message authentication code (MAC) verification that prevents
+file tampering. Use it at your own risk.
 
 ### Extended replacement in structured content
 
@@ -829,46 +1020,63 @@ will become
       HostName target.link
 ```
 
-### Kustomization generator
+#### Replacements source reuse
 
-`KustomizationGenerator` is the kustomize equivalent to
-`HelmChartInflationGenerator`. It allows generating resources from a
-kustomization.
+In the above examples, the `ReplacementTransformer` gets the source data from a
+generator that is injected (`config.kaweezle.com/inject-local: "true"`) and then
+removed (`config.kaweezle.com/prune-local: "true"`). The extended version of
+`ReplacementTransformer` allows specifying a `source:` that can either be a
+resource file or the path of a kustomization.
 
-Example:
+We can create a `properties.yaml` file:
 
 ```yaml
-apiVersion: builtin
-kind: KustomizationGenerator
+# properties.yaml
+apiVersion: autocloud.config.kaweezle.com/v1alpha1
+kind: PlatformValues
 metadata:
-  name: kustomization-generator
+  name: autocloud-values
+data:
+  traefik:
+    dashboard_enabled: true
+    expose: true
+  sish:
+    hostname: mydomain.link
+    remote: argocd.mydomain.link
+    host_key: AAAAC3NzaC1lZDI1NTE5AAAAIEAfLUpTj0fn5sJFW6agmLMsvEacMBvXocyzHLW+AOSQ
+    # more configuration below...
+```
+
+And then reference it from our replacements:
+
+```yaml
+# fn-traefik-customization.yaml
+apiVersion: builtin
+kind: ReplacementTransformer
+metadata:
+  name: replacement-transformer
   annotations:
-    config.kaweezle.com/path: "uninode.yaml"
     config.kubernetes.io/function: |
       exec:
         path: krmfnbuiltin
-kustomizeDirectory: https://github.com/antoinemartin/autocloud.git//packages/uninode?ref=deploy/citest
+# Source of replacements
+source: properties.yaml
+replacements:
+  - source:
+      kind: LocalConfiguration
+      fieldPath: data.traefik.dashboard_enabled
+    targets:
+      - select:
+          kind: Application
+          name: traefik
+        fieldPaths:
+          # !!yaml tells the transformer that the property contains YAML
+          - spec.source.helm.values.!!yaml.ingressRoute.dashboard.enabled
 ```
 
-If this function is run with the following command:
-
-```console
-> kustomize fn run --enable-exec --fn-path functions applications
-```
-
-It will generate a file named `uninode.yaml` in the `applications` directory.
-With:
-
-```yaml
-config.kaweezle.com/path: ""
-```
-
-One file will be created per resource (see
-[Keeping or deleting generated resources](#keeping-or-deleting-generated-resources)).
-
-**IMPORTANT** `krmfnbuiltin` runs from the directory where the
-`kustomize run fn` command has been launched, and **not from the function
-configuration folder**. Any relative path should take this into consideration.
+As the source of the replacement is _sideloaded_, there no need to inject it nor
+remove it from the configuration. Also, as the `source` can be a kustomization,
+there is no need for it to be local.
 
 ## Installation
 
@@ -884,7 +1092,7 @@ curl -sLS https://raw.githubusercontent.com/kaweezle/krmfnbuiltin/main/get.sh | 
 If you don't want to pipe into shell, you can do:
 
 ```console
-> KRMFNBUILTIN_VERSION="v0.3.0"
+> KRMFNBUILTIN_VERSION="v0.4.0"
 > curl -sLo /usr/local/bin/krmfnbuiltin https://github.com/kaweezle/krmfnbuiltin/releases/download/${KRMFNBUILTIN_VERSION}/krmfnbuiltin_${KRMFNBUILTIN_VERSION}_linux_amd64
 ```
 
@@ -913,7 +1121,7 @@ summarize:
 ```Dockerfile
 FROM argoproj/argocd:latest
 
-ARG KRMFNBUILTIN_VERSION=v0.3.0
+ARG KRMFNBUILTIN_VERSION=v0.4.0
 
 # Switch to root for the ability to perform install
 USER root
@@ -966,5 +1174,5 @@ perform the basic tests with kpt.
 [ConfigMapGenerator kustomize documentation]:
   https://kubectl.docs.kubernetes.io/references/kustomize/builtins/#_configmapgenerator_
 [replacements kustomize documentation]: https://kubectl.docs.kubernetes.io/references/kustomize/kustomization/replacements/
-
+[sops]: https://github.com/mozilla/sops
 <!-- prettier-ignore-end -->
