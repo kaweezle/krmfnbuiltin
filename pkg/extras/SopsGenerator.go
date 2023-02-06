@@ -26,11 +26,7 @@ const (
 type SopsGeneratorPlugin struct {
 	yaml.ResourceMeta
 
-	Spec struct {
-		// Replicas is the number of Deployment replicas
-		// Defaults to the REPLICAS env var, or 1
-		Files []string `yaml:"files,omitempty"`
-	} `yaml:"spec,omitempty"`
+	Files []string `yaml:"files,omitempty"`
 
 	Sops map[string]interface{} `json:"sops,omitempty" yaml:"spec,omitempty"`
 
@@ -86,7 +82,7 @@ func (p *SopsGeneratorPlugin) Config(h *resmap.PluginHelpers, c []byte) (err err
 	if p.Sops != nil {
 		p.buffer = c
 	} else {
-		if p.Spec.Files == nil {
+		if p.Files == nil {
 			err = fmt.Errorf("generator configuration doesn't contain any file")
 			return
 		}
@@ -127,7 +123,7 @@ func (p *SopsGeneratorPlugin) Generate() (resmap.ResMap, error) {
 		}
 	} else {
 
-		for _, file := range p.Spec.Files {
+		for _, file := range p.Files {
 
 			b, err := p.h.Loader().Load(file)
 			if err != nil {
