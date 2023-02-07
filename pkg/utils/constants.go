@@ -29,6 +29,9 @@ const (
 	// local configuration resource (local-config)
 	FunctionAnnotationInjectLocal = LocalConfigurationAnnotationDomain + "/inject-local"
 
+	// if set, Remove any transformation leftover annotations
+	FunctionAnnotationCleanup = LocalConfigurationAnnotationDomain + "/cleanup"
+
 	// if set, the transformation will remove all the resources marked as local-config
 	FunctionAnnotationPruneLocal = LocalConfigurationAnnotationDomain + "/prune-local"
 	// Saving path for injected resource
