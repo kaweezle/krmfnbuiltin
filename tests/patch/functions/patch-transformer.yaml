@@ -3,6 +3,7 @@ kind: PatchTransformer
 metadata:
   name: not-important-to-example
   annotations:
+    config.kaweezle.com/cleanup: "true"
     config.kubernetes.io/function: |
       exec:
         path: ../../krmfnbuiltin
