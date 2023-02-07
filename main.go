@@ -62,15 +62,19 @@ func main() {
 				return errors.WrapPrefixf(err, "Transforming resources")
 			}
 
-			for _, r := range rm.Resources() {
-				utils.RemoveBuildAnnotations(r)
+			configAnnotations := config.GetAnnotations()
+
+			if _, ok := configAnnotations[utils.FunctionAnnotationCleanup]; ok {
+				for _, r := range rm.Resources() {
+					utils.RemoveBuildAnnotations(r)
+				}
 			}
 
 			rl.Items = rm.ToRNodeSlice()
 
 			// If the annotation `config.kaweezle.com/prune-local` is present in a
 			// transformer makes all the local resources disappear.
-			if _, ok := config.GetAnnotations()[utils.FunctionAnnotationPruneLocal]; ok {
+			if _, ok := configAnnotations[utils.FunctionAnnotationPruneLocal]; ok {
 				err = rl.Filter(utils.UnLocal)
 				if err != nil {
 					return errors.WrapPrefixf(err, "while pruning `config.kaweezle.com/local-config` resources")
@@ -110,7 +114,7 @@ func main() {
 
 	cmd := command.Build(processor, command.StandaloneDisabled, false)
 	command.AddGenerateDockerfile(cmd)
-	cmd.Version = "v0.4.0" // <---VERSION--->
+	cmd.Version = "v0.4.1" // <---VERSION--->
 
 	if err := cmd.Execute(); err != nil {
 		os.Exit(1)

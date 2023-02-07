@@ -14,7 +14,9 @@ transformation in your kustomize projects.
   <summary>Table of Contents</summary>
   <ol>
     <li><a href="#rationale">Rationale</a></li>
-    <li><a href="#usage-example">Usage Example</a></li>
+    <li><a href="#usage-example">Usage Example</a>
+    <ul><li><a href="#internal-annotations-cleanup">Internal annotations cleanup</a></li></ul>
+    </li>
     <li><a href="#use-of-generators">Use of generators</a></li>
     <li><a href="#keeping-or-deleting-generated-resources">Keeping or deleting generated resources</a></li>
     <li><a href="#extensions">Extensions</a>
@@ -133,12 +135,14 @@ kind: PatchTransformer
 metadata:
   name: fn-change-repo-and-branch
   annotations:
+    # This will remove the internal annotations the transformer adds.
+    config.kaweezle.com/cleanup: "true"
     config.kubernetes.io/function: |
       exec:
         path: krmfnbuiltin
     # Can also be:
     #  container:
-    #    image: ghcr.io/kaweezle/krmfnbuiltin:v0.4.0
+    #    image: ghcr.io/kaweezle/krmfnbuiltin:v0.4.1
 patch: |-
   - op: replace
       path: /spec/source/repoURL
@@ -173,6 +177,40 @@ source:
 
 You now can commit the 10 modified manifests in your branch and deploy the
 applications.
+
+### Internal annotations cleanup
+
+Some kustomize transformers add annotations to enable for instance reference
+reconciliation at the end of the build. These annotations have the prefix
+`internal.config.kubernetes.io`. When performing a `kustomize build`, kustomize
+removes them at the end of the process. When we are using the transformations in
+the context of a KRM function with `kustomize fn run`, the build cleanup is not
+performed. In consequence, the annotations would be added to the resource file
+touched by the transformation. For instance:
+
+```diff
+--- original.argocd.yaml
++++ transformed.argocd.yaml
+@@ -5,6 +5,9 @@
+   namespace: argocd
+   annotations:
+     autocloud/local: "true"
++    internal.config.kubernetes.io/previousKinds: Application
++    internal.config.kubernetes.io/previousNames: argo-cd
++    internal.config.kubernetes.io/previousNamespaces: argocd
+ spec:
+   destination:
+     namespace: argocd
+```
+
+To avoid that, you can insert the following annotation:
+
+```yaml
+config.kaweezle.com/cleanup: "true"
+```
+
+It will inform krmfnbuiltin that you are not using the transformer in the
+context of a bulid and that the internal annotations need to be removed.
 
 ## Use of generators
 
@@ -1092,7 +1130,7 @@ curl -sLS https://raw.githubusercontent.com/kaweezle/krmfnbuiltin/main/get.sh | 
 If you don't want to pipe into shell, you can do:
 
 ```console
-> KRMFNBUILTIN_VERSION="v0.4.0"
+> KRMFNBUILTIN_VERSION="v0.4.1"
 > curl -sLo /usr/local/bin/krmfnbuiltin https://github.com/kaweezle/krmfnbuiltin/releases/download/${KRMFNBUILTIN_VERSION}/krmfnbuiltin_${KRMFNBUILTIN_VERSION}_linux_amd64
 ```
 
@@ -1121,7 +1159,7 @@ summarize:
 ```Dockerfile
 FROM argoproj/argocd:latest
 
-ARG KRMFNBUILTIN_VERSION=v0.4.0
+ARG KRMFNBUILTIN_VERSION=v0.4.1
 
 # Switch to root for the ability to perform install
 USER root
