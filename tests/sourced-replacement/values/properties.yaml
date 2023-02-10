@@ -9,3 +9,4 @@ data:
     repo: antoinemartin/autocloud
     email: john@doe.me
     clientID: thisisfakeclientid
+  to_encode: This is the value to encode in base64

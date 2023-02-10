@@ -26,3 +26,14 @@ replacements:
           name: argocd-cm
         fieldPaths:
           - data.dex\.config.!!yaml.connectors.[id=github].config.orgs.0.name
+  - source:
+      name: autocloud-values
+      fieldPath: data.to_encode
+      options:
+        encoding: base64
+    targets:
+      - select:
+          kind: ConfigMap
+          name: argocd-cm
+        fieldPaths:
+          - data.b64encoded

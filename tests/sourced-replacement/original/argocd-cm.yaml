@@ -34,3 +34,4 @@ data:
           teamNameField: slug
           orgs:
             - name: johndoe
+  b64encoded: dGhpc2lzZmFrZXZhbHVl
