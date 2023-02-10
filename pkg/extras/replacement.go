@@ -96,18 +96,27 @@ func selectSourceNode(nodes []*yaml.RNode, selector *types.SourceSelector) (*yam
 }
 
 func getRefinedValue(options *types.FieldOptions, rn *yaml.RNode) (*yaml.RNode, error) {
-	if options == nil || options.Delimiter == "" {
+	if options == nil || (options.Delimiter == "" && options.Encoding == "") {
 		return rn, nil
 	}
 	if rn.YNode().Kind != yaml.ScalarNode {
-		return nil, fmt.Errorf("delimiter option can only be used with scalar nodes")
-	}
-	value := strings.Split(yaml.GetValue(rn), options.Delimiter)
-	if options.Index >= len(value) || options.Index < 0 {
-		return nil, fmt.Errorf("options.index %d is out of bounds for value %s", options.Index, yaml.GetValue(rn))
+		return nil, fmt.Errorf("delimiter or encoding option can only be used with scalar nodes")
 	}
 	n := rn.Copy()
-	n.YNode().Value = value[options.Index]
+	if options.Delimiter != "" {
+		value := strings.Split(yaml.GetValue(rn), options.Delimiter)
+		if options.Index >= len(value) || options.Index < 0 {
+			return nil, fmt.Errorf("options.index %d is out of bounds for value %s", options.Index, yaml.GetValue(rn))
+		}
+
+		n.YNode().Value = value[options.Index]
+	} else {
+		value, err := GetEncodedValue(yaml.GetValue(rn), options.Encoding)
+		if err != nil {
+			return nil, errors.Wrapf(err, "while encoding value")
+		}
+		n.YNode().Value = value
+	}
 	return n, nil
 }
 
