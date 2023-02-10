@@ -1112,9 +1112,38 @@ replacements:
           - spec.source.helm.values.!!yaml.ingressRoute.dashboard.enabled
 ```
 
-As the source of the replacement is _sideloaded_, there no need to inject it nor
-remove it from the configuration. Also, as the `source` can be a kustomization,
-there is no need for it to be local.
+As the source of the replacement is _side loaded_, there no need to inject it
+nor remove it from the configuration. Also, as the `source` can be a
+kustomization, there is no need for it to be local.
+
+#### Replacement with encoding
+
+Kustomize has an `encoding` option in `ReplacementTransformer` that is currently
+unused. We put it to the work and provide three encoding types:
+
+- base64
+- bcrypt
+- hex
+
+Example:
+
+```yaml
+- source:
+    name: autocloud-values
+    fieldPath: data.to_encode
+    options:
+      encoding: base64
+  targets:
+    - select:
+        kind: ConfigMap
+        name: argocd-cm
+      fieldPaths:
+        - data.b64encoded
+```
+
+Thanks to this feature, you can keep some values in clear text inside your
+properties files and encode them on kustomization. Be aware that the `bcrypt`
+encoding will generate a new value for each kustomization.
 
 ## Installation
 
