@@ -37,3 +37,28 @@ replacements:
           name: argocd-cm
         fieldPaths:
           - data.b64encoded
+  - source:
+      name: autocloud-values
+      fieldPath: data.cluster.argocd.domainPrefix
+    targets:
+      - select:
+          kind: Ingress
+        fieldPaths:
+          - spec.rules.0.host
+          - spec.tls.0.hosts.0
+          - spec.tls.0.secretName
+        options:
+          delimiter: "."
+          index: 0
+  - source:
+      name: autocloud-values
+      fieldPath: data.ovh.dnsZone
+    targets:
+      - select:
+          kind: Ingress
+          name: argocd-sish
+        fieldPaths:
+          - spec.rules.0.host.!!regex.^[\w-]+\\.(\.*)$.1
+          - spec.tls.0.hosts.0.!!regex.^[\w-]+\\.(\.*)$.1
+          - spec.tls.0.secretName.!!regex.^[\w-]+\\.(\.*)-tls$.1
+          - metadata.annotations.external-dns\.alpha\.kubernetes\.io/target

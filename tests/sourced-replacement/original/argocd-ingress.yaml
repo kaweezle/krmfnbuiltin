@@ -1,0 +1,32 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-issuer
+    external-dns.alpha.kubernetes.io/ttl: "60"
+    # This is needed to avoid creating a DNS entry with local IP address
+    external-dns.alpha.kubernetes.io/target: holepunch.in
+    ingress.kubernetes.io/auth-secret: argo-sso
+  labels:
+    app.kubernetes.io/name: argocd-sish
+    app.kubernetes.io/component: edge
+    app.kubernetes.io/part-of: autocloud
+  name: argocd-sish
+  namespace: argocd
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: citest.holepunch.in
+      http:
+        paths:
+          - pathType: Prefix
+            path: /
+            backend:
+              service:
+                name: argocd-server
+                port:
+                  number: 80
+  tls:
+    - hosts:
+        - citest.holepunch.in
+      secretName: citest.holepunch.in-tls

@@ -10,3 +10,8 @@ data:
     email: john@doe.me
     clientID: thisisfakeclientid
   to_encode: This is the value to encode in base64
+  ovh:
+    dnsZone: develop.cx
+  cluster:
+    argocd:
+      domainPrefix: argocd-devenv
