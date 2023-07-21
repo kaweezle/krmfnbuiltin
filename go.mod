@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/go-git/go-git/v5 v5.6.1
 	github.com/lithammer/dedent v1.1.0
-	github.com/stretchr/testify v1.8.1
+	github.com/stretchr/testify v1.8.2
 	go.mozilla.org/sops/v3 v3.7.3
 	golang.org/x/tools v0.9.1
 	sigs.k8s.io/kustomize/api v0.13.4
